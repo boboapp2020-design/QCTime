@@ -853,6 +853,10 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .cf-sign i { display: block; font-style: normal; letter-spacing: 1px; line-height: 1; white-space: nowrap; overflow: hidden; }
 .cf-sign b { display: block; min-height: 22px; border-bottom: 1px solid #000; font-weight: 600; margin: 4px 14px 4px; }
 .cf-sign span { font-weight: 700; }
+.cf-sign > div { position: relative; }
+.cf-sign .sig-slot { position: absolute; left: 0; right: 0; top: -34px; height: 42px; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.cf-sign .sig-slot:empty { display: none; }
+.cf-sign .sig-slot img { max-height: 58px; max-width: 200px; object-fit: contain; mix-blend-mode: multiply; }
 .cf-foot { margin-top: 12px; text-align: right; font-size: 12.5px; }
 .cf.void::after { content: "CANCELLED"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-20deg); font-family: Mitr, sans-serif; font-size: 80px; font-weight: 700; letter-spacing: 6px; color: rgba(229,72,77,.16); pointer-events: none; white-space: nowrap; }
 @media (max-width: 860px) { .coa-layout { grid-template-columns: 1fr; } .coa-lot { grid-template-columns: auto 1fr 28px; grid-template-areas: "no info rm" "bags bags rm" "why why rm"; } .cf-info { grid-template-columns: 1fr; } .cf-info > div:empty { display: none; } }
@@ -2274,6 +2278,9 @@ const COA_STATUS = { new: ["ยังไม่บันทึก", "info"], requ
 const coaVal = (lot, k) => lot[k] === null || lot[k] === undefined ? "" : (k === "color" || k === "sed") ? fmtInt(lot[k]) : k === "invert" || k === "ash" ? fmt(lot[k], 4) : fmt(lot[k], 2);
 // เลข Lot/Strike ที่ "จ่ายออกแล้ว" (มีในบันทึกการจ่ายออกที่ไม่ใช่ร่าง) — ออก COA ได้เฉพาะลอตเหล่านี้
 const dispatchedSet = () => { const s = new Set(); (typeof dpRecs === "function" ? dpRecs() : []).forEach(d => { if (d.status !== "draft") (d.lots || []).forEach(l => { if (l.no) s.add(String(l.no)); }); }); return s; };
+// ลายเซ็นดิจิทัลในใบ COA: map username -> ไฟล์ลายเซ็น (เพิ่มคนอื่นได้ที่นี่)
+const COA_SIGN = { approve01: "assets/sign-approve01.png", qa01: "assets/sign-qa01.png" };
+const signatureFor = name => { const u = (typeof USERS !== "undefined" ? USERS : []).find(x => x.name === name); return (u && COA_SIGN[u.user]) ? COA_SIGN[u.user] : ""; };
 // dd/mm/yyyy + n months (best-before default = production + 24 months)
 const addMonthsDmy = (dmy, n) => { const m = String(dmy || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if (!m) return ""; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1 + n, +m[1]); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
 // app roles -> COA roles: marketing (ฝ่ายขาย) writes part 1, QC/QA write part 2, admin does both
@@ -2405,7 +2412,7 @@ views.coa = {
           <tr class="sp"><td>Method</td><td></td><td></td>${COA_COLS.map(c => `<td>${v((rec.method || {})[c[0]])}</td>`).join("")}</tr>
         </tbody></table></div>
         ${rec.cancelled ? `<div class="coa-cancel">CANCELLED · ${esc(rec.cancelReason || "")} · by ${esc(rec.cancelledBy || "")} ${rec.cancelledAt ? fmtTs(rec.cancelledAt) : ""}</div>` : ""}
-        <div class="cf-sign"><div><i>..................................................</i><b>${v(rec.reporter)}</b><span>Reporter</span></div><div><i>..................................................</i><b>${v(rec.approvedBy)}</b><span>Approved by</span></div></div>
+        <div class="cf-sign"><div><div class="sig-slot">${signatureFor(rec.reporter) ? `<img src="${signatureFor(rec.reporter)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.reporter)}</b><span>Reporter</span></div><div><div class="sig-slot">${signatureFor(rec.approvedBy) ? `<img src="${signatureFor(rec.approvedBy)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.approvedBy)}</b><span>Approved by</span></div></div>
         <div class="cf-foot">ML-FM-1610-037:27/07/2022 Rev.06</div>
       </div>`;
     }
