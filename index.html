@@ -854,7 +854,7 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .cf-sign b { display: block; min-height: 22px; border-bottom: 1px solid #000; font-weight: 600; margin: 4px 14px 4px; }
 .cf-sign span { font-weight: 700; }
 .cf-sign > div { position: relative; }
-.cf-sign .sig-slot { position: absolute; left: 0; right: 0; top: -34px; height: 42px; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
+.cf-sign .sig-slot { position: absolute; left: 0; right: 0; top: -22px; height: 42px; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
 .cf-sign .sig-slot:empty { display: none; }
 .cf-sign .sig-slot img { max-height: 58px; max-width: 200px; object-fit: contain; mix-blend-mode: multiply; }
 .cf-foot { margin-top: 12px; text-align: right; font-size: 12.5px; }
@@ -1240,14 +1240,14 @@ views.login = {
     <nav class="login-wrap" aria-label="เข้าสู่ระบบ">
       <div class="login-box">
         <img src="assets/login-frame.png" alt="">
-        <form id="loginForm" novalidate>
+        <form id="loginForm" novalidate autocomplete="off">
           <label class="lf-input lf-user">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4.2"/><path d="M4 20c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5v1H4z"/></svg>
-            <input id="lu" type="text" placeholder="Username" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="ชื่อผู้ใช้">
+            <input id="lu" type="text" placeholder="Username" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="ชื่อผู้ใช้">
           </label>
           <label class="lf-input lf-pass">
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.5A1.5 1.5 0 0 1 20 11.5v8A1.5 1.5 0 0 1 18.5 21h-13A1.5 1.5 0 0 1 4 19.5v-8A1.5 1.5 0 0 1 5.5 10zm2 0h6V8a3 3 0 0 0-6 0zm3 4.2a1.6 1.6 0 0 0-.8 3v1.3h1.6v-1.3a1.6 1.6 0 0 0-.8-3z"/></svg>
-            <input id="lp" type="password" placeholder="Password" autocomplete="current-password" aria-label="รหัสผ่าน">
+            <input id="lp" type="password" placeholder="Password" autocomplete="off" aria-label="รหัสผ่าน">
             <button type="button" class="eye" id="eye" aria-label="แสดงรหัสผ่าน" aria-pressed="false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="slash" d="M4 4l16 16"/></svg>
             </button>
