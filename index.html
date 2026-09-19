@@ -708,14 +708,16 @@ body.phone-mode > #app { display: none; }
 .lotsum { display: flex; gap: 14px; }
 .lotsum div { text-align: center; } .lotsum b { display: block; font-size: 16px; font-weight: 600; } .lotsum span { font-size: 11px; color: var(--ink-2); }
 .dp-lots { display: grid; gap: 8px; margin: 8px 0 10px; }
-.lot-row { display: grid; grid-template-columns: 26px minmax(120px, 1fr) auto auto auto 28px; align-items: center; gap: 8px; padding: 8px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
+.lot-row { display: grid; grid-template-columns: 26px minmax(120px, 1fr) auto auto 28px; align-items: center; gap: 8px; padding: 8px; border: 1.5px solid var(--line); border-radius: 12px; background: #fff; }
 .lot-row .n { width: 26px; height: 26px; border-radius: 50%; background: var(--leaf-soft); color: var(--leaf-deep); font-size: 12.5px; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; }
 .lot-row .input, .lot-row .select { padding: 7px 10px; }
 .lot-row .bags { display: flex; align-items: center; gap: 4px; } .lot-row .bags .input { width: 84px; text-align: right; } .lot-row .bags small { font-size: 11px; color: var(--ink-2); }
-.lot-row .tg { padding: 6px 10px; border-radius: 999px; border: 1.5px solid var(--line); background: #fff; font-size: 12.5px; white-space: nowrap; }
-.lot-row .tg.ok { background: var(--leaf-soft); border-color: #bfe9c8; color: var(--leaf-deep); } .lot-row .tg.bad { background: #fde5e6; border-color: #f5c2c4; color: var(--bad); }
+.lot-row .lot-r { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lot-row .lot-r .rlbl { display: inline-flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
+.lot-row .lot-r .rchk { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+.lot-row .lot-r .rnum { width: 68px; text-align: right; }
 .lot-row .rm { width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--paper-2); color: var(--ink-2); font-size: 16px; }
-@media (max-width: 640px) { .lot-row { grid-template-columns: 26px 1fr 28px; } .lot-row .bags, .lot-row .tg { grid-column: 2; } }
+@media (max-width: 640px) { .lot-row { grid-template-columns: 26px 1fr 28px; } .lot-row .bags, .lot-row .lot-r { grid-column: 2; } }
 
 /* detail sheet */
 .dp-sheet { min-height: 0; }
@@ -1870,7 +1872,7 @@ function dpNewDraft() {
   return { id: recs.reduce((m, r) => Math.max(m, +r.id || 0), 0) + 1, uid: "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     recordedBy: { name: u.name, username: (localStorage.getItem("qc.lastUser") || u.name) }, status: "draft", date: todayIso(),
     plate: "", transport: "", customer: "", truckType: "", coa: false, timeStart: "", timeEnd: "", prodYear: currentSeason(),
-    sugarType: "", pack: "", tons: 0, bay: "", lots: [{ no: "", bags: "", clean: true, firm: true }],
+    sugarType: "", pack: "", tons: 0, bay: "", lots: [{ no: "", bags: "", r: false, rNum: "" }],
     tarp: "", seal: "", note: "", otherNote: "", driverName: "", logisticsName: "", sigs: {}, checks: {}, photos: [], log: [] };
 }
 function dpLog(rec, action, note) { const u = getUser(); (rec.log = rec.log || []).push({ ts: new Date().toISOString(), action, by: u.name, note: note || "" }); }
@@ -2134,14 +2136,14 @@ views.release = {
       return `<option value="">— เลือก Lot —</option>${extra}` + rows.slice(0, 800).map(r => `<option value="${esc(r.strike)}" ${r.strike === String(selected) ? "selected" : ""}>${esc(r.strike)} · ${esc(r.grade)} · สี ${fmtN(r.color, 0)} · ${esc(r.date)}</option>`).join("");
     }
     function lotsHtml() {
-      const d = draft; return d.lots.map((l, i) => `<div class="lot-row" data-i="${i}"><span class="n">${i + 1}</span><select class="select lotno">${lotOptions(l.no)}</select><div class="bags"><input class="input" type="number" inputmode="numeric" min="0" value="${esc(l.bags)}" placeholder="0"><small>กระสอบ</small></div><button type="button" class="tg ${l.clean ? "ok" : "bad"}" data-t="clean">${l.clean ? "✓ สะอาด" : "✕ ไม่สะอาด"}</button><button type="button" class="tg ${l.firm ? "ok" : "bad"}" data-t="firm">${l.firm ? "✓ แน่น" : "✕ ไม่แน่น"}</button><button type="button" class="rm" aria-label="ลบ">×</button></div>`).join("");
+      const d = draft; return d.lots.map((l, i) => `<div class="lot-row" data-i="${i}"><span class="n">${i + 1}</span><select class="select lotno">${lotOptions(l.no)}</select><div class="lot-r"><label class="rlbl"><input type="checkbox" class="rchk" ${l.r ? "checked" : ""}> R</label>${l.r ? `<input class="input rnum" type="number" inputmode="numeric" value="${esc(l.rNum || "")}" placeholder="เลข">` : ""}</div><div class="bags"><input class="input" type="number" inputmode="numeric" min="0" value="${esc(l.bags)}" placeholder="0"><small>กระสอบ</small></div><button type="button" class="rm" aria-label="ลบ">×</button></div>`).join("");
     }
-    function lotStats() { const d = draft; $("#lotsum").innerHTML = `<div><b>${d.lots.length}</b><span>Lot</span></div><div><b>${fmtInt(dpBags(d))}</b><span>กระสอบ</span></div><div><b>${d.lots.filter(l => l.clean && l.firm).length}/${d.lots.length}</b><span>ผ่านตรวจ</span></div>`; d.tons = dpTons(d); const t = $("#w_tons"); if (t) t.value = fmt(d.tons, 3) + " ตัน"; }
+    function lotStats() { const d = draft; $("#lotsum").innerHTML = `<div><b>${d.lots.length}</b><span>Lot</span></div><div><b>${fmtInt(dpBags(d))}</b><span>กระสอบ</span></div>`; d.tons = dpTons(d); const t = $("#w_tons"); if (t) t.value = fmt(d.tons, 3) + " ตัน"; }
 
     function lotsTable(d) {
       const L = d.lots || []; const two = L.length > 10; const n = two ? Math.ceil(L.length / 2) : L.length;
-      const td = (l, i) => l ? `<td>${i + 1}</td><td>${esc(l.no)}</td><td class="r">${fmtInt(+l.bags || 0)}</td><td>${l.clean ? "สะอาด" : '<span class="bad">ไม่สะอาด</span>'} · ${l.firm ? "แน่น" : '<span class="bad">ไม่แน่น</span>'}</td>` : "<td></td><td></td><td></td><td></td>";
-      const head = `<th>#</th><th>Lot</th><th class="r">กระสอบ</th><th>สภาพ</th>`;
+      const td = (l, i) => l ? `<td>${i + 1}</td><td>${esc(l.no)}</td><td class="r">${fmtInt(+l.bags || 0)}</td><td>${l.r ? esc(l.rNum || "✓") : "—"}</td>` : "<td></td><td></td><td></td><td></td>";
+      const head = `<th>#</th><th>Lot</th><th class="r">กระสอบ</th><th>R</th>`;
       return `<table class="ctab lots${two ? " two" : ""}" style="margin-top:8px"><thead><tr>${head}${two ? head : ""}</tr></thead><tbody>${Array.from({ length: n }, (_, i) => `<tr>${td(L[i], i)}${two ? td(L[i + n], i + n) : ""}</tr>`).join("")}</tbody></table>`;
     }
     function summaryHtml(d, withHead) {
@@ -2189,7 +2191,7 @@ views.release = {
       const d = draft; const g = id => { const el = $("#" + id); return el ? el.value.trim() : undefined; };
       if (step === 0) { d.date = g("w_date") || d.date; d.prodYear = g("w_prodYear"); d.timeStart = g("w_timeStart"); d.plate = g("w_plate"); d.transport = g("w_transport"); d.customer = g("w_customer"); d.truckType = chipValue($("#w_truck")); d.coa = swOn($("#w_coa")); }
       if (step === 1) { d.otherNote = g("w_otherNote"); }
-      if (step === 2) { d.sugarType = g("w_sugarType"); d.pack = g("w_pack"); d.bay = chipValue($("#w_bay")); root.querySelectorAll(".lot-row").forEach((row, i) => { d.lots[i].no = row.querySelector(".lotno").value.trim(); d.lots[i].bags = row.querySelector(".bags input").value.trim(); }); d.tons = dpTons(d); }
+      if (step === 2) { d.sugarType = g("w_sugarType"); d.pack = g("w_pack"); d.bay = chipValue($("#w_bay")); root.querySelectorAll(".lot-row").forEach((row, i) => { d.lots[i].no = row.querySelector(".lotno").value.trim(); d.lots[i].bags = row.querySelector(".bags input").value.trim(); const rc = row.querySelector(".rchk"); if (rc) d.lots[i].r = rc.checked; const rn = row.querySelector(".rnum"); if (rn) d.lots[i].rNum = rn.value.trim(); }); d.tons = dpTons(d); }
       if (step === 3) { d.tarp = chipValue($("#w_tarp")); d.seal = g("w_seal"); d.timeEnd = g("w_timeEnd"); d.note = g("w_note"); d.driverName = g("w_driverName"); d.logisticsName = g("w_logisticsName"); }
       saveDraftState();
     }
@@ -2217,11 +2219,11 @@ views.release = {
           body.querySelectorAll("[data-rm]").forEach(b => b.addEventListener("click", () => { draft.photos.splice(+b.dataset.rm, 1); saveDraftState(); renderMain(); }));
         }
         if (step === 2) {
-          if (!draft.lots.length) draft.lots.push({ no: "", bags: "", clean: true, firm: true });
+          if (!draft.lots.length) draft.lots.push({ no: "", bags: "", r: false, rNum: "" });
           const lotsEl = $("#dpLots"); lotsEl.innerHTML = lotsHtml(); lotStats();
-          lotsEl.addEventListener("input", e => { const row = e.target.closest(".lot-row"); if (!row) return; const i = +row.dataset.i; if (e.target.classList.contains("lotno")) draft.lots[i].no = e.target.value.trim(); else draft.lots[i].bags = e.target.value.trim(); lotStats(); saveDraftState(); });
-          lotsEl.addEventListener("click", e => { const row = e.target.closest(".lot-row"); if (!row) return; const i = +row.dataset.i; const tg = e.target.closest(".tg"); if (tg) { draft.lots[i][tg.dataset.t] = !draft.lots[i][tg.dataset.t]; } else if (e.target.closest(".rm")) { draft.lots.splice(i, 1); if (!draft.lots.length) draft.lots.push({ no: "", bags: "", clean: true, firm: true }); } else return; lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); });
-          $("#w_addLot").addEventListener("click", () => { readStep(); draft.lots.push({ no: "", bags: "", clean: true, firm: true }); lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); lotsEl.lastElementChild.querySelector(".lotno").focus(); });
+          lotsEl.addEventListener("input", e => { const row = e.target.closest(".lot-row"); if (!row) return; const i = +row.dataset.i; if (e.target.classList.contains("lotno")) draft.lots[i].no = e.target.value.trim(); else if (e.target.classList.contains("rnum")) draft.lots[i].rNum = e.target.value.trim(); else if (e.target.classList.contains("rchk")) return; else draft.lots[i].bags = e.target.value.trim(); lotStats(); saveDraftState(); });
+          lotsEl.addEventListener("click", e => { const row = e.target.closest(".lot-row"); if (!row) return; const i = +row.dataset.i; if (e.target.classList.contains("rchk")) { draft.lots[i].r = e.target.checked; } else if (e.target.closest(".rm")) { draft.lots.splice(i, 1); if (!draft.lots.length) draft.lots.push({ no: "", bags: "", r: false, rNum: "" }); } else return; lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); });
+          $("#w_addLot").addEventListener("click", () => { readStep(); draft.lots.push({ no: "", bags: "", r: false, rNum: "" }); lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); lotsEl.lastElementChild.querySelector(".lotno").focus(); });
           $("#w_pack").addEventListener("change", () => { draft.pack = $("#w_pack").value; lotStats(); });
           $("#w_sugarType").addEventListener("change", () => { draft.sugarType = $("#w_sugarType").value; draft.lots.forEach(l => { if (l.no && !(Q.rows || []).some(r => r.status === "ผ่าน" && r.strike === String(l.no) && r.grade === gradeOfSugar(draft.sugarType))) l.no = ""; }); lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); });
         }
@@ -2259,7 +2261,7 @@ views.release = {
     document.addEventListener("qc:dispatch", () => { if (root.isConnected) renderList(); });
 
     // start: preselect from ?lot=, resume draft, refresh from sheet
-    if (params.get("lot") && (role === "recorder" || role === "admin")) { draft = dpNewDraft(); draft.lots = [{ no: params.get("lot"), bags: "", clean: true, firm: true }]; const lot = (Q.rows || []).find(r => r.strike === params.get("lot")); if (lot) draft.sugarType = DP.SUGAR.find(s => s.includes(lot.grade)) || ""; step = 0; mode = "wizard"; saveDraftState(); }
+    if (params.get("lot") && (role === "recorder" || role === "admin")) { draft = dpNewDraft(); draft.lots = [{ no: params.get("lot"), bags: "", r: false, rNum: "" }]; const lot = (Q.rows || []).find(r => r.strike === params.get("lot")); if (lot) draft.sugarType = DP.SUGAR.find(s => s.includes(lot.grade)) || ""; step = 0; mode = "wizard"; saveDraftState(); }
     if (params.get("tab") === "status" || (role !== "recorder" && role !== "admin" && mode !== "wizard")) showTab("status");
     if (params.get("tab") === "dash") { showTab("dash"); renderDash(); }
     if (params.get("uid")) { const r = dpRecs().find(x => x.uid === params.get("uid")); if (r) { cur = r; mode = "detail"; showTab("status"); } }
