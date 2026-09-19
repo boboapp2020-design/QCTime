@@ -1,0 +1,20 @@
+{
+  "name": "QC Time · Mitr Lao Sugar",
+  "short_name": "QC Time",
+  "description": "ระบบงานควบคุมคุณภาพน้ำตาล: ค้นหา Lot, จ่ายออกน้ำตาล, ออกใบ COA",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1e90ff",
+  "theme_color": "#1e90ff",
+  "lang": "th",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "ค้นหา Lot", "short_name": "ค้นหา Lot", "url": "./index.html#/find-lot", "icons": [{ "src": "assets/btn-find-lot.png", "sizes": "640x639", "type": "image/png" }] },
+    { "name": "จ่ายออกน้ำตาล", "short_name": "จ่ายออก", "url": "./index.html#/release", "icons": [{ "src": "assets/btn-release.png", "sizes": "640x637", "type": "image/png" }] }
+  ]
+}
