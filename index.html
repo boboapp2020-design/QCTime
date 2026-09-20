@@ -84,7 +84,7 @@ h1, h2, h3, p { margin: 0; }
 .landing {
   --logo-w: clamp(240px, 42vw, 620px);
   --tile-w: clamp(120px, 22vw, 300px);
-  --mascot-w: clamp(110px, 20vw, 300px);
+  --mascot-w: clamp(88px, 13vw, 190px);
   --gap: clamp(10px, 2vw, 28px);
   position: relative;
   min-height: 100vh; min-height: 100dvh;
@@ -152,7 +152,7 @@ h1, h2, h3, p { margin: 0; }
 .landing .tile.locked { opacity: .5; filter: grayscale(.7); cursor: not-allowed; position: relative; }
 .landing .tile.locked::after { content: "🔒"; position: absolute; right: 8px; top: 8px; font-size: 18px; filter: none; }
 .landing .mascot {
-  position: absolute; left: clamp(4px, 2vw, 40px); top: clamp(52px, 10vh, 120px); bottom: auto;
+  position: absolute; left: calc(50% - var(--logo-w) / 2 - var(--mascot-w) * 0.52); top: clamp(24px, 7vh, 96px); bottom: auto;
   width: var(--mascot-w); filter: drop-shadow(0 12px 18px rgba(0,40,90,.35));
   transform-origin: 50% 100%; animation: float-mascot 3.2s ease-in-out infinite; pointer-events: none; z-index: 2;
 }
