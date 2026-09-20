@@ -2697,8 +2697,8 @@ views.repack = {
     });
     setSync("กำลังโหลดรายการ Lot…");
     loadQuality(false).then(() => {
-      const rows = [...(Q.rows || [])].sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
-      sel.innerHTML = `<option value="">— เลือก Lot —</option>` + rows.map(r => `<option value="${esc(r.strike)}">${esc(r.strike)} · ${esc(r.grade || "—")} · ${esc(r.date || "")}</option>`).join("");
+      const rows = [...(Q.rows || [])].filter(r => !/organic/i.test(r.grade || "")).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
+      sel.innerHTML = `<option value="">— เลือก Lot —</option>` + rows.map(r => `<option value="${esc(r.strike)}">${esc(r.strike)}</option>`).join("");
       setSync(rows.length ? "" : "ไม่พบ Lot ในชีต Quality");
     });
   },
