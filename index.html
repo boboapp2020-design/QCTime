@@ -2626,14 +2626,16 @@ const SICON = {
 const srow = (icon, label, sub, ctl, cls = "") => `<div class="srow ${cls}"><div class="sico">${SICON[icon] || ""}</div><div class="stxt"><b>${label}</b>${sub ? `<small>${sub}</small>` : ""}</div><div class="sctl">${ctl}</div></div>`;
 
 /* ---------- 3e. Repack (PA01) · บันทึกการแพ็คซ้ำตาม Lot → ชีต Quality คอลัมน์ V เป็นต้นไป ---------- */
-// R-code จากวันผลิต: "R" + วัน(2) + เดือน(2) + ฤดู(0=ฤดูปัจจุบัน, 1=เก่ากว่านั้น)
-const repackCode = dateStr => {
-  const m = String(dateStr || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (!m) return null;
-  const dd = m[1].padStart(2, "0"), mm = m[2].padStart(2, "0");
+// R-code: "R" + วัน(2) + เดือน(2) ของ "วันบันทึก" (วันนี้) + หลักฤดู(0=ฤดูปัจจุบัน, 1=ฤดูก่อนหน้า) อิงจากวันผลิตของ Lot
+const repackCode = prodDate => {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, "0");     // วันบันทึก
+  const mm = String(now.getMonth() + 1).padStart(2, "0"); // เดือนบันทึก
+  const m = String(prodDate || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;                                    // ต้องมีวันผลิตที่อ่านได้ เพื่อคำนวณหลักฤดู
   let y = +m[3]; if (y < 100) y += 2000; if (y > 2400) y -= 543; // พ.ศ. -> ค.ศ.
-  const prodEndYear = (+mm >= 5) ? y + 1 : y;      // ฤดู Dec–Apr นับปีที่สิ้นสุด
-  const s = (prodEndYear === new Date().getFullYear()) ? 0 : 1;
+  const prodEndYear = (+m[2] >= 5) ? y + 1 : y;           // ฤดู Dec–Apr นับปีที่สิ้นสุด
+  const s = (prodEndYear === now.getFullYear()) ? 0 : 1;
   return "R" + dd + mm + s;
 };
 views.repack = {
@@ -2643,7 +2645,8 @@ views.repack = {
       <div class="rp-grid">
         <section class="panel rp-card"><div class="panel-body">
           <h3 class="rp-h">เลือก Lot</h3>
-          <select class="select" id="rpLot"><option value="">— เลือก Lot —</option></select>
+          <input class="input" id="rpLot" list="rpLotList" placeholder="พิมพ์หรือเลือกเลข Lot" autocomplete="off" inputmode="numeric">
+          <datalist id="rpLotList"></datalist>
           <div class="rp-info" id="rpInfo"></div>
           <div class="rp-actions">
             <button class="btn ghost" id="rpCancel" type="button">ยกเลิก</button>
@@ -2661,7 +2664,7 @@ views.repack = {
     const $ = s => root.querySelector(s);
     const sel = $("#rpLot"), info = $("#rpInfo"), okBtn = $("#rpOk"), recsEl = $("#rpRecords"), sync = $("#rpSync");
     const setSync = t => { if (sync) sync.innerHTML = t || ""; };
-    const curLot = () => (Q.rows || []).find(r => r.strike === sel.value);
+    const curLot = () => { const v = (sel.value || "").trim(); return v ? (Q.rows || []).find(r => r.strike === v || String(r.strikeN) === v) : null; };
     const renderRecords = (recs, loading) => {
       if (loading) { recsEl.innerHTML = `<div class="rp-empty"><b>กำลังโหลด…</b></div>`; return; }
       if (!recs || !recs.length) { recsEl.innerHTML = `<div class="rp-empty"><img src="assets/mascot.png" alt=""><b>ยังไม่มีบันทึก Repack</b><span>เลือก Lot แล้วกด ตกลง เพื่อบันทึก</span></div>`; return; }
@@ -2680,7 +2683,8 @@ views.repack = {
       info.innerHTML = `<div class="rp-facts"><div><span>เกรด</span><b>${esc(l.grade || "—")}</b></div><div><span>วันผลิต</span><b>${esc(l.date || "—")}</b></div><div><span>จะบันทึกรหัส</span><b class="rp-code">${code || '<span style="color:var(--bad)">วันผลิตไม่ถูกต้อง</span>'}</b></div></div>`;
       okBtn.disabled = !code;
     };
-    sel.addEventListener("change", () => { showInfo(); fetchRecords(sel.value); });
+    sel.addEventListener("change", () => { showInfo(); const l = curLot(); fetchRecords(l ? l.strike : ""); });
+    sel.addEventListener("input", showInfo);
     $("#rpCancel").addEventListener("click", () => { sel.value = ""; showInfo(); renderRecords([]); });
     okBtn.addEventListener("click", async () => {
       const l = curLot(); if (!l) { toast("เลือก Lot ก่อน"); return; }
@@ -2698,7 +2702,7 @@ views.repack = {
     setSync("กำลังโหลดรายการ Lot…");
     loadQuality(false).then(() => {
       const rows = [...(Q.rows || [])].filter(r => !/organic/i.test(r.grade || "")).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
-      sel.innerHTML = `<option value="">— เลือก Lot —</option>` + rows.map(r => `<option value="${esc(r.strike)}">${esc(r.strike)}</option>`).join("");
+      $("#rpLotList").innerHTML = rows.map(r => `<option value="${esc(r.strike)}"></option>`).join("");
       setSync(rows.length ? "" : "ไม่พบ Lot ในชีต Quality");
     });
   },
