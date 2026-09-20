@@ -31,6 +31,7 @@
   --sky: #1e90ff; --sky-deep: #0f6fd6; --sky-soft: #e4f1ff;
   --leaf: #2ec24a; --leaf-deep: #1c9a36; --leaf-soft: #e3f8e7;
   --mango: #ff9f1c; --mango-deep: #e8850a; --mango-soft: #fff1dc;
+  --grape: #8b5cf6; --grape-deep: #7c3aed; --grape-soft: #f1ebff;
   --kraft: #e9c79a; --kraft-deep: #c99a5b;
   --ok: #21b34a; --warn: #f5a300; --bad: #e5484d;
   --accent: var(--sky); --accent-deep: var(--sky-deep); --accent-soft: var(--sky-soft);
@@ -167,11 +168,11 @@ h1, h2, h3, p { margin: 0; }
   .landing .tile { display: flex; align-items: center; gap: 12px; width: 100%; border-radius: 22px; text-decoration: none; filter: none; }
   .landing .tile img { width: var(--tile-w); flex: none; border-radius: 18%; filter: drop-shadow(0 10px 14px rgba(0,40,90,.35)); }
   .landing .tile-txt { display: flex; flex-direction: column; justify-content: center; flex: 1; min-width: 0; position: relative; padding: 12px 40px 12px 16px; border-radius: 20px; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 10px 26px rgba(0,40,90,.22); border-left: 6px solid var(--sky); color: var(--ink); text-align: left; }
-  .landing .tile.leaf .tile-txt { border-left-color: var(--leaf); } .landing .tile.mango .tile-txt { border-left-color: var(--mango); }
+  .landing .tile.leaf .tile-txt { border-left-color: var(--leaf); } .landing .tile.mango .tile-txt { border-left-color: var(--mango); } .landing .tile.grape .tile-txt { border-left-color: var(--grape); }
   .landing .tile-txt b { font-size: 18px; font-weight: 600; line-height: 1.2; }
   .landing .tile-txt small { font-size: 12.5px; color: var(--ink-2); margin-top: 3px; line-height: 1.35; }
   .landing .tile-txt i { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 20px; line-height: 1; color: #fff; background: var(--sky); }
-  .landing .tile.leaf .tile-txt i { background: var(--leaf); } .landing .tile.mango .tile-txt i { background: var(--mango); }
+  .landing .tile.leaf .tile-txt i { background: var(--leaf); } .landing .tile.mango .tile-txt i { background: var(--mango); } .landing .tile.grape .tile-txt i { background: var(--grape); }
   .landing .tile:hover, .landing .tile:focus-visible { transform: none; filter: none; }
   .landing .tile:active { transform: scale(.98); }
   .landing .brand { font-size: 12px; padding: 5px 10px 5px 8px; }
@@ -859,6 +860,20 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .cf-sign .sig-slot { position: absolute; left: 0; right: 0; top: -22px; height: 42px; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; }
 .cf-sign .sig-slot:empty { display: none; }
 .cf-sign .sig-slot img { max-height: 58px; max-width: 200px; object-fit: contain; mix-blend-mode: multiply; }
+/* Repack page */
+.repack-page .rp-grid { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .repack-page .rp-grid { grid-template-columns: 1fr; } }
+.repack-page .rp-h { font-size: 15px; font-weight: 600; color: var(--accent-deep); margin: 0 0 10px; }
+.repack-page #rpLot { width: 100%; }
+.rp-info { margin-top: 12px; }
+.rp-facts { display: grid; gap: 8px; }
+.rp-facts > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--paper-2, #f3f5f8); border-radius: 10px; padding: 9px 12px; }
+.rp-facts span { color: var(--ink-2); font-size: 13px; } .rp-facts b { font-weight: 600; }
+.rp-facts .rp-code { font-size: 18px; color: var(--accent-deep); letter-spacing: .5px; }
+.rp-actions { display: flex; gap: 10px; margin-top: 16px; } .rp-actions .btn { flex: 1; }
+.rp-sync { margin-top: 10px; font-size: 12.5px; color: var(--ink-2); min-height: 16px; }
+.rp-records { min-height: 120px; }
+.rp-empty { text-align: center; color: var(--ink-2); padding: 28px 10px; } .rp-empty img { width: 84px; opacity: .9; display: inline-block; } .rp-empty b { display: block; margin-top: 8px; } .rp-empty span { display: block; font-size: 12.5px; margin-top: 2px; }
 .cf-foot { margin-top: 12px; text-align: right; font-size: 12.5px; }
 .cf.void::after { content: "CANCELLED"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-20deg); font-family: Mitr, sans-serif; font-size: 80px; font-weight: 700; letter-spacing: 6px; color: rgba(229,72,77,.16); pointer-events: none; white-space: nowrap; }
 @media (max-width: 860px) { .coa-layout { grid-template-columns: 1fr; } .coa-lot { grid-template-columns: auto 1fr 28px; grid-template-areas: "no info rm" "bags bags rm" "why why rm"; } .cf-info { grid-template-columns: 1fr; } .cf-info > div:empty { display: none; } }
@@ -1050,6 +1065,7 @@ const USERS = [
   { user: "approve01", pass: "1234", name: "ท้าวคำตัน สอนพุกปะเสิด",      role: "ผู้อนุมัติ" },
   { user: "approve02", pass: "1234", name: "ท้าวพูโขง เข็มมะวง",          role: "ผู้อนุมัติ" },
   { user: "sa01",      pass: "1234", name: "พนักงานฝ่ายขาย",             role: "ฝ่ายขาย" },
+  { user: "pa01",      pass: "1234", name: "พนักงานแพ็ค (Repack)",       role: "แพ็ค" },
   { user: "admin",     pass: "9999", name: "ຜູ້ດູແລລະບົບ",                role: "ผู้ดูแลระบบ" },
 ];
 // Ask the Apps Script to verify a login against the Users sheet; null = server not available / not updated -> use local list
@@ -1174,8 +1190,9 @@ document.addEventListener("click", e => { const b = e.target.closest("[data-phon
 if (IN_FRAME) document.documentElement.classList.add("in-frame");
 const views = {};
 /* ---------- per-role page access (deny-list: role → pages they may NOT open) ---------- */
-const PAGE_DENY = { "คลังสินค้า": ["release", "coa"], "QC": ["coa"], "ฝ่ายขาย": ["release"] };
-const canOpen = name => !(PAGE_DENY[(getUser().role || "")] || []).includes(name);
+const PAGE_DENY = { "คลังสินค้า": ["release", "coa"], "QC": ["coa"], "ฝ่ายขาย": ["release"], "แพ็ค": ["find-lot", "release", "coa"] };
+const REPACK_ROLES = ["แพ็ค", "ผู้ดูแลระบบ"]; // เฉพาะ PA01 (แพ็ค) และ admin เข้าปุ่ม Repack ได้
+const canOpen = name => name === "repack" ? REPACK_ROLES.includes(getUser().role || "") : !(PAGE_DENY[(getUser().role || "")] || []).includes(name);
 function route() {
   const hash = location.hash.slice(1) || "/";
   const [path, qs] = hash.split("?");
@@ -1217,6 +1234,7 @@ views.home = {
     </div>
     <header class="logo"><img src="assets/logo.png" alt="QC Time"></header>
     <nav aria-label="เมนูหลัก"><ul class="menu">
+      <li><a class="tile grape" href="#/repack" aria-label="Repack"><img src="assets/btn-repack.png" alt=""><span class="tile-txt"><b>Repack</b><small>บันทึกการแพ็คซ้ำตาม Lot</small><i>›</i></span></a></li>
       <li><a class="tile sky" href="#/find-lot" aria-label="ค้นหา Lot"><img src="assets/btn-find-lot.png" alt=""><span class="tile-txt"><b>ค้นหา Lot</b><small>ค่าคุณภาพตาม Strike และสเปคลูกค้า</small><i>›</i></span></a></li>
       <li><a class="tile leaf" href="#/release" aria-label="จ่ายออกน้ำตาล"><img src="assets/btn-release.png" alt=""><span class="tile-txt"><b>จ่ายออกน้ำตาล</b><small>บันทึกการส่งมอบ ตรวจรถ และอนุมัติ</small><i>›</i></span></a></li>
       <li><a class="tile mango" href="#/coa" aria-label="ออกใบ COA"><img src="assets/btn-coa.png" alt=""><span class="tile-txt"><b>ออกใบ COA</b><small>ใบรับรองผลวิเคราะห์สำหรับลูกค้า</small><i>›</i></span></a></li>
@@ -2601,6 +2619,84 @@ const SICON = {
 };
 const srow = (icon, label, sub, ctl, cls = "") => `<div class="srow ${cls}"><div class="sico">${SICON[icon] || ""}</div><div class="stxt"><b>${label}</b>${sub ? `<small>${sub}</small>` : ""}</div><div class="sctl">${ctl}</div></div>`;
 
+/* ---------- 3e. Repack (PA01) · บันทึกการแพ็คซ้ำตาม Lot → ชีต Quality คอลัมน์ V เป็นต้นไป ---------- */
+// R-code จากวันผลิต: "R" + วัน(2) + เดือน(2) + ฤดู(0=ฤดูปัจจุบัน, 1=เก่ากว่านั้น)
+const repackCode = dateStr => {
+  const m = String(dateStr || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!m) return null;
+  const dd = m[1].padStart(2, "0"), mm = m[2].padStart(2, "0");
+  let y = +m[3]; if (y < 100) y += 2000; if (y > 2400) y -= 543; // พ.ศ. -> ค.ศ.
+  const prodEndYear = (+mm >= 5) ? y + 1 : y;      // ฤดู Dec–Apr นับปีที่สิ้นสุด
+  const s = (prodEndYear === new Date().getFullYear()) ? 0 : 1;
+  return "R" + dd + mm + s;
+};
+views.repack = {
+  bar: true, title: "Repack", sub: "บันทึกการแพ็คซ้ำตาม Lot · ลงชีต Quality", icon: "btn-repack.png", accent: "grape",
+  html: () => `
+    <div class="page repack-page">
+      <div class="rp-grid">
+        <section class="panel rp-card"><div class="panel-body">
+          <h3 class="rp-h">เลือก Lot</h3>
+          <select class="select" id="rpLot"><option value="">— เลือก Lot —</option></select>
+          <div class="rp-info" id="rpInfo"></div>
+          <div class="rp-actions">
+            <button class="btn ghost" id="rpCancel" type="button">ยกเลิก</button>
+            <button class="btn" id="rpOk" type="button" disabled>✓ ตกลง บันทึก</button>
+          </div>
+          <div class="rp-sync" id="rpSync"></div>
+        </div></section>
+        <section class="panel rp-card"><div class="panel-body">
+          <h3 class="rp-h">บันทึก Repack ของ Lot นี้</h3>
+          <div class="rp-records" id="rpRecords"><div class="rp-empty"><img src="assets/mascot.png" alt=""><b>เลือก Lot เพื่อดูบันทึก</b></div></div>
+        </div></section>
+      </div>
+    </div>`,
+  init: (root) => {
+    const $ = s => root.querySelector(s);
+    const sel = $("#rpLot"), info = $("#rpInfo"), okBtn = $("#rpOk"), recsEl = $("#rpRecords"), sync = $("#rpSync");
+    const setSync = t => { if (sync) sync.innerHTML = t || ""; };
+    const curLot = () => (Q.rows || []).find(r => r.strike === sel.value);
+    const renderRecords = (recs, loading) => {
+      if (loading) { recsEl.innerHTML = `<div class="rp-empty"><b>กำลังโหลด…</b></div>`; return; }
+      if (!recs || !recs.length) { recsEl.innerHTML = `<div class="rp-empty"><img src="assets/mascot.png" alt=""><b>ยังไม่มีบันทึก Repack</b><span>เลือก Lot แล้วกด ตกลง เพื่อบันทึก</span></div>`; return; }
+      recsEl.innerHTML = `<table class="ctab"><thead><tr><th>#</th><th>วันที่บันทึก</th><th>รหัส</th></tr></thead><tbody>${recs.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.date || "—")}</td><td><b>${esc(r.value)}</b></td></tr>`).join("")}</tbody></table>`;
+    };
+    const fetchRecords = async strike => {
+      const url = apiUrl(); if (!url || !strike) { renderRecords([]); return; }
+      renderRecords(null, true);
+      try { const j = await fetch(url + "?action=getRepack&strike=" + encodeURIComponent(strike) + "&_=" + Date.now()).then(r => r.json()); renderRecords(j.ok ? j.records : []); }
+      catch (e) { recsEl.innerHTML = `<div class="rp-empty"><b style="color:var(--bad)">โหลดบันทึกไม่ได้</b></div>`; }
+    };
+    const showInfo = () => {
+      const l = curLot();
+      if (!l) { info.innerHTML = ""; okBtn.disabled = true; return; }
+      const code = repackCode(l.date);
+      info.innerHTML = `<div class="rp-facts"><div><span>เกรด</span><b>${esc(l.grade || "—")}</b></div><div><span>วันผลิต</span><b>${esc(l.date || "—")}</b></div><div><span>จะบันทึกรหัส</span><b class="rp-code">${code || '<span style="color:var(--bad)">วันผลิตไม่ถูกต้อง</span>'}</b></div></div>`;
+      okBtn.disabled = !code;
+    };
+    sel.addEventListener("change", () => { showInfo(); fetchRecords(sel.value); });
+    $("#rpCancel").addEventListener("click", () => { sel.value = ""; showInfo(); renderRecords([]); });
+    okBtn.addEventListener("click", async () => {
+      const l = curLot(); if (!l) { toast("เลือก Lot ก่อน"); return; }
+      const code = repackCode(l.date); if (!code) { toast("วันผลิตของ Lot นี้ไม่ถูกต้อง"); return; }
+      const url = apiUrl(); if (!url) { toast("ยังไม่ได้ตั้งค่า Web App URL"); return; }
+      okBtn.disabled = true; setSync("กำลังบันทึก…");
+      try {
+        const j = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveRepack", strike: l.strike, rcode: code }) }).then(r => r.json());
+        if (j.ok) { toast(`<b>บันทึกแล้ว</b> Lot ${esc(l.strike)} · ${esc(code)}`); fetchRecords(l.strike); }
+        else if (j.duplicate) { toast(`<b>ซ้ำ</b> วันนี้บันทึก Lot ${esc(l.strike)} ไปแล้ว`); }
+        else { toast(`<b>บันทึกไม่ได้</b> ${esc(j.error || "")}`); }
+      } catch (e) { toast("<b>บันทึกไม่ได้</b> ตรวจสอบอินเทอร์เน็ต / Web App URL"); }
+      finally { okBtn.disabled = false; setSync(""); }
+    });
+    setSync("กำลังโหลดรายการ Lot…");
+    loadQuality(false).then(() => {
+      const rows = [...(Q.rows || [])].sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
+      sel.innerHTML = `<option value="">— เลือก Lot —</option>` + rows.map(r => `<option value="${esc(r.strike)}">${esc(r.strike)} · ${esc(r.grade || "—")} · ${esc(r.date || "")}</option>`).join("");
+      setSync(rows.length ? "" : "ไม่พบ Lot ในชีต Quality");
+    });
+  },
+};
 views.settings = {
   bar: true, title: "ตั้งค่า", sub: "การเปลี่ยนแปลงจะบันทึกให้อัตโนมัติ", accent: "sky",
   html: () => `
