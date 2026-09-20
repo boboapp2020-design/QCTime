@@ -1240,7 +1240,7 @@ views.home = {
     </div>
     <header class="logo"><img src="assets/logo.png" alt="QC Time"></header>
     <nav aria-label="เมนูหลัก"><ul class="menu">
-      <li><a class="tile grape" href="#/repack" aria-label="Repack"><img src="assets/btn-repack.png" alt=""><span class="tile-txt"><b>Repack</b><small>บันทึกการแพ็คซ้ำตาม Lot</small><i>›</i></span></a></li>
+      <li><a class="tile grape" href="#/repack" aria-label="Repack"><img src="assets/btn-repack-01.png" alt=""><span class="tile-txt"><b>Repack</b><small>บันทึกการแพ็คซ้ำตาม Lot</small><i>›</i></span></a></li>
       <li><a class="tile sky" href="#/find-lot" aria-label="ค้นหา Lot"><img src="assets/btn-find-lot.png" alt=""><span class="tile-txt"><b>ค้นหา Lot</b><small>ค่าคุณภาพตาม Strike และสเปคลูกค้า</small><i>›</i></span></a></li>
       <li><a class="tile leaf" href="#/release" aria-label="จ่ายออกน้ำตาล"><img src="assets/btn-release.png" alt=""><span class="tile-txt"><b>จ่ายออกน้ำตาล</b><small>บันทึกการส่งมอบ ตรวจรถ และอนุมัติ</small><i>›</i></span></a></li>
       <li><a class="tile mango" href="#/coa" aria-label="ออกใบ COA"><img src="assets/btn-coa.png" alt=""><span class="tile-txt"><b>ออกใบ COA</b><small>ใบรับรองผลวิเคราะห์สำหรับลูกค้า</small><i>›</i></span></a></li>
@@ -2637,7 +2637,7 @@ const repackCode = dateStr => {
   return "R" + dd + mm + s;
 };
 views.repack = {
-  bar: true, title: "Repack", sub: "บันทึกการแพ็คซ้ำตาม Lot · ลงชีต Quality", icon: "btn-repack.png", accent: "grape",
+  bar: true, title: "Repack", sub: "บันทึกการแพ็คซ้ำตาม Lot · ลงชีต Quality", icon: "btn-repack-01.png", accent: "grape",
   html: () => `
     <div class="page repack-page">
       <div class="rp-grid">
