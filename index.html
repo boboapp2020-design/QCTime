@@ -127,13 +127,16 @@ h1, h2, h3, p { margin: 0; }
 .landing .logo img { display: block; width: 100%; height: auto; -webkit-user-drag: none; }
 @keyframes float-logo { 0%,100% { transform: translateY(0) rotate(-.6deg); } 50% { transform: translateY(-12px) rotate(.6deg); } }
 .landing .menu {
-  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-  gap: var(--gap); width: 100%; max-width: 1100px; margin: clamp(8px, 3vh, 36px) 0; padding: 0; list-style: none;
+  display: flex; flex-wrap: nowrap; justify-content: center; align-items: center;
+  gap: var(--gap); width: 100%; max-width: 1220px; margin: clamp(8px, 3vh, 36px) 0; padding: 0 12px; list-style: none;
 }
+.landing .menu li { flex: 0 1 var(--tile-w); min-width: 0; }
+.landing .menu li .tile { width: 100%; }
 .landing .menu li { animation: pop-in .6s cubic-bezier(.34,1.56,.64,1) both; }
 .landing .menu li:nth-child(1) { animation-delay: .15s; }
 .landing .menu li:nth-child(2) { animation-delay: .30s; }
 .landing .menu li:nth-child(3) { animation-delay: .45s; }
+.landing .menu li:nth-child(4) { animation-delay: .60s; }
 @keyframes pop-in { from { opacity: 0; transform: translateY(30px) scale(.85); } to { opacity: 1; transform: none; } }
 .landing .tile {
   display: block; width: var(--tile-w); border-radius: 18%;
@@ -142,6 +145,8 @@ h1, h2, h3, p { margin: 0; }
 }
 .landing .tile img { display: block; width: 100%; height: auto; pointer-events: none; -webkit-user-drag: none; }
 .landing .tile-txt { display: none; }
+.landing .tile.grape { overflow: hidden; }                 /* crop white background off the Repack icon */
+.landing .tile.grape img { transform: scale(1.13); border-radius: 18%; }
 .landing .tile:hover, .landing .tile:focus-visible { transform: translateY(-8px) scale(1.06); filter: drop-shadow(0 20px 26px rgba(0,40,90,.42)) brightness(1.05); }
 .landing .tile:active { transform: translateY(2px) scale(.96); transition-duration: .08s; }
 .landing .tile.locked { opacity: .5; filter: grayscale(.7); cursor: not-allowed; position: relative; }
@@ -1062,8 +1067,8 @@ const USERS = [
   { user: "qa01",      pass: "1234", name: "ท้าววงปะเสิด สีลาพม",         role: "QA" },
   { user: "qa02",      pass: "1234", name: "นางอำไพพอน สุวินคำ",          role: "QA" },
   { user: "qa03",      pass: "1234", name: "นางคำเพีด พมมะสาน",           role: "QA" },
-  { user: "approve01", pass: "1234", name: "ท้าวคำตัน สอนพุกปะเสิด",      role: "ผู้อนุมัติ" },
-  { user: "approve02", pass: "1234", name: "ท้าวพูโขง เข็มมะวง",          role: "ผู้อนุมัติ" },
+  { user: "ap01",      pass: "1234", name: "ท้าวคำตัน สอนพุกปะเสิด",      role: "ผู้อนุมัติ" },
+  { user: "ap02",      pass: "1234", name: "ท้าวพูโขง เข็มมะวง",          role: "ผู้อนุมัติ" },
   { user: "sa01",      pass: "1234", name: "พนักงานฝ่ายขาย",             role: "ฝ่ายขาย" },
   { user: "pa01",      pass: "1234", name: "พนักงานแพ็ค (Repack)",       role: "แพ็ค" },
   { user: "admin",     pass: "9999", name: "ຜູ້ດູແລລະບົບ",                role: "ผู้ดูแลระบบ" },
@@ -1145,7 +1150,8 @@ function avatarImg(u) {
   if (role === "QC") return female ? "assets/av-qc-f.png" : "assets/av-qc-m.png";
   if (role === "QA") return female ? "assets/av-qa-f.png" : "assets/av-qa-m.png";
   if (role === "ฝ่ายขาย") return "assets/av-sales.png";
-  if (role === "ผู้อนุมัติ") return uname === "approve02" ? "assets/av-appr2.png" : "assets/av-appr.png";
+  if (role === "แพ็ค") return "assets/av-pa.png";
+  if (role === "ผู้อนุมัติ") return uname === "ap02" ? "assets/av-appr2.png" : "assets/av-appr.png";
   return "assets/av-admin.png";
 }
 function barHtml({ title, sub, icon, tabs }) {
@@ -2299,7 +2305,7 @@ const coaVal = (lot, k) => lot[k] === null || lot[k] === undefined ? "" : (k ===
 // เลข Lot/Strike ที่ "จ่ายออกแล้ว" (มีในบันทึกการจ่ายออกที่ไม่ใช่ร่าง) — ออก COA ได้เฉพาะลอตเหล่านี้
 const dispatchedSet = () => { const s = new Set(); (typeof dpRecs === "function" ? dpRecs() : []).forEach(d => { if (d.status !== "draft") (d.lots || []).forEach(l => { if (l.no) s.add(String(l.no)); }); }); return s; };
 // ลายเซ็นดิจิทัลในใบ COA: map username -> ไฟล์ลายเซ็น (เพิ่มคนอื่นได้ที่นี่)
-const COA_SIGN = { approve01: "assets/sign-approve01.png", qa01: "assets/sign-qa01.png" };
+const COA_SIGN = { ap01: "assets/sign-approve01.png", qa01: "assets/sign-qa01.png" };
 const signatureFor = name => { const u = (typeof USERS !== "undefined" ? USERS : []).find(x => x.name === name); return (u && COA_SIGN[u.user]) ? COA_SIGN[u.user] : ""; };
 // dd/mm/yyyy + n months (best-before default = production + 24 months)
 const addMonthsDmy = (dmy, n) => { const m = String(dmy || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if (!m) return ""; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1 + n, +m[1]); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
