@@ -2437,8 +2437,8 @@ views.coa = {
     $("#cTabDash").addEventListener("click", e => { const a = e.target.closest("[data-open]"); if (!a) return; e.preventDefault(); const r = coaRecs().find(x => x.certNo === a.dataset.open); if (r) { open(r); renderList(); showTab("main"); } });
     $("#d_print").addEventListener("click", () => window.print());
     $("#d_csv").addEventListener("click", () => {
-      const H = ["Certificate No.", "Date", "Status", "COA Request No.", "Customer", "Company of Import", "Truck No.", "Grade", "Lot Number", "Export Invoice NO", "S/O", "Booking", "Packed in", "Ton", "Shipment Lot", "Lots certified", "Lots out of spec", "Reporter", "Approved by", "Requested by", "Issued at", "Cancel reason"];
-      const rows = dRecs().map(r => [r.certNo, isoToDmy(r.reqDate), COA_STATUS[stOf(r)][0], r.reqNo, r.customer, r.importer, coaTrucksOf(r).join(", "), r.grade, r.lotNumber, r.invoiceNo, r.soNo, r.booking, r.packIn, r.packedTons, r.shipmentLot, (r.lots || []).map(l => l.strike).join(" "), (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(" "), r.reporter, r.approvedBy, r.requestedBy, r.issuedAt ? fmtTs(r.issuedAt) : "", r.cancelReason || ""]);
+      const H = ["Certificate No.", "Date", "Status", "COA Request No.", "Customer", "Company of Import", "Truck No.", "Grade", "Lot Number", "Export Invoice NO", "S/O", "Booking", "Packed in", "Ton", "Remark", "Shipment Lot", "Lots certified", "Lots out of spec", "Reporter", "Approved by", "Requested by", "Issued at", "Cancel reason"];
+      const rows = dRecs().map(r => [r.certNo, isoToDmy(r.reqDate), COA_STATUS[stOf(r)][0], r.reqNo, r.customer, r.importer, coaTrucksOf(r).join(", "), r.grade, r.lotNumber, r.invoiceNo, r.soNo, r.booking, r.packIn, r.packedTons, r.remark, r.shipmentLot, (r.lots || []).map(l => l.strike).join(" "), (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(" "), r.reporter, r.approvedBy, r.requestedBy, r.issuedAt ? fmtTs(r.issuedAt) : "", r.cancelReason || ""]);
       const csv = "﻿" + [H, ...rows].map(a => a.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `QCTime-COA-${todayIso().replace(/-/g, "")}.csv`; a.click(); toast("⬇ ดาวน์โหลด CSV แล้ว");
     });
@@ -2470,6 +2470,7 @@ views.coa = {
             ${row("", "S/O :", v(rec.soNo))}
             ${row("", "Booking :", v(rec.booking))}
             ${row("", "PACKED IN " + v(rec.packIn), v(rec.packedTons), "Ton")}
+            ${rec.remark ? `<span class="lb"></span><u class="w rm-free">${v(rec.remark)}</u>` : ""}
           </div>
           <div class="cf-trucks"><span class="lb">Truck No. :</span><div class="cf-tgrid">${Array.from({ length: COA_MAX_TRUCKS }, (_, i) => `<div><i>${String.fromCharCode(97 + i)}</i><u>${v(trucks[i])}</u></div>`).join("")}</div></div>
         </div>
@@ -2493,7 +2494,7 @@ views.coa = {
       if (keep && keep.bestBefore) base.bestBefore = keep.bestBefore; if (keep && !lot) { base.prodDate = keep.prodDate || ""; }
       return base;
     }
-    function newRec() { return { form: COA_FORM, certNo: nextCertNo(todayIso()), status: "new", reqDate: todayIso(), reqNo: "", customer: "", importer: "", trucks: [], truckNo: "", grade: "", lotNumber: "", invoiceNo: "", soNo: "", booking: "", packIn: "", packedTons: "", shipmentLot: "", lots: [], spec: {}, method: {}, reporter: "", approvedBy: "", requestedBy: me.name, ts: Date.now() }; }
+    function newRec() { return { form: COA_FORM, certNo: nextCertNo(todayIso()), status: "new", reqDate: todayIso(), reqNo: "", customer: "", importer: "", trucks: [], truckNo: "", grade: "", lotNumber: "", invoiceNo: "", soNo: "", booking: "", packIn: "", packedTons: "", remark: "", shipmentLot: "", lots: [], spec: {}, method: {}, reporter: "", approvedBy: "", requestedBy: me.name, ts: Date.now() }; }
     // pull customer / grade / pack / tons / lot numbers from the delivery records of the chosen trucks (fills only what is empty, except tons & lots which follow the trucks)
     function fillFromTrucks() {
       const ds = coaTrucksOf(cur).map(coaDispOf).filter(Boolean); cur.truckNo = coaTrucksOf(cur).join(", ");
@@ -2553,6 +2554,7 @@ views.coa = {
           <div class="coa-remark"><span class="coa-remark-h">Remark</span>
             <div class="grid-2">${f("e_inv", "Export Invoice NO", `<input class="input" id="e_inv" value="${esc(cur.invoiceNo || "")}" data-f="invoiceNo" ${dis}>`)}${f("e_so", "S/O", `<input class="input" id="e_so" value="${esc(cur.soNo || "")}" data-f="soNo" ${dis}>`)}</div>
             <div class="grid-2">${f("e_book", "Booking", `<input class="input" id="e_book" value="${esc(cur.booking || "")}" data-f="booking" ${dis}>`)}<div class="grid-2">${f("e_pack", "PACKED IN", `<input class="input" id="e_pack" list="coaPacks" value="${esc(cur.packIn || "")}" data-f="packIn" placeholder="เช่น 50 kg" autocomplete="off" ${dis}><datalist id="coaPacks">${DP.PACK.map(p => `<option value="${esc(p)}">`).join("")}</datalist>`)}${f("e_tons", "Ton", `<input class="input" id="e_tons" value="${esc(cur.packedTons || "")}" data-f="packedTons" inputmode="decimal" placeholder="รวมจากรถ" ${dis}>`)}</div></div>
+            ${f("e_remark", "ข้อความเพิ่มเติม", `<input class="input" id="e_remark" value="${esc(cur.remark || "")}" data-f="remark" placeholder="หมายเหตุอื่นๆ (ไม่บังคับ)" ${dis}>`)}
           </div>
           ${f("e_ship", "Shipment Lot Number", `<input class="input" id="e_ship" value="${esc(cur.shipmentLot)}" data-f="shipmentLot" placeholder="เลข Lot การจัดส่ง" ${dis}>`)}
           ${p1open
