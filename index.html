@@ -828,7 +828,7 @@ body.phone-mode > #app { display: none; }
 .coa-hist { display: grid; gap: 8px; margin-top: 12px; max-height: calc(100vh - 320px); overflow: auto; }
 .coa-cancel { margin: 10px 0; padding: 8px 12px; border-radius: 10px; background: #fde5e6; color: var(--bad); font-size: 12.5px; font-weight: 500; font-family: Mitr, sans-serif; }
 .btn.danger-solid { background: var(--bad); box-shadow: 0 6px 0 #b8363a, 0 10px 22px rgba(229,72,77,.35); }
-/* the certificate paper · form ML-FM-1610-037 Rev.06 (A4 landscape, AngsanaUPC 16pt in the original) */
+/* the certificate paper · form ML-FM-1610-037 Rev.07 (A4 landscape, AngsanaUPC 16pt in the original) */
 .coa-sheet { min-height: 0; padding: clamp(18px, 3vw, 30px) clamp(16px, 3vw, 34px); }
 /* the COA certificate has no colored border/stripe */
 .coa-sheet::before { display: none !important; }
@@ -846,7 +846,31 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .cf-info > div.wide { grid-column: 1 / -1; }
 .cf-info span { font-weight: 700; white-space: nowrap; }
 .cf-info u { flex: 1; text-decoration: none; border-bottom: 1px solid #000; padding: 0 6px; min-height: 20px; font-weight: 600; }
-.cf-res { margin: 12px 0 6px; font-weight: 700; }
+/* Rev.07 header block: Date / Cert No. rows, then left labels + Truck No. a–p */
+.cf-top { display: grid; grid-template-columns: 1.15fr 1fr; gap: 3px 22px; }
+.cf-top > div { display: flex; align-items: baseline; gap: 6px; min-height: 22px; }
+.cf-top span, .cf-body .lb, .cf-body .sb { font-weight: 700; white-space: nowrap; }
+.cf-top u, .cf-body u { text-decoration: none; border-bottom: 1px solid #000; padding: 0 6px; min-height: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cf-top u { flex: 1; }
+.cf-top > div:last-child u { flex: 0 1 46%; margin-left: auto; }
+.cf-body { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0 22px; margin-top: 2px; }
+.cf-left { display: grid; grid-template-columns: max-content max-content 1fr max-content; align-items: end; gap: 3px 6px; }
+.cf-left .lb { grid-column: 1; } .cf-left .sb { grid-column: 2; } .cf-left u { grid-column: 3; } .cf-left u.w { grid-column: 2 / 5; } .cf-left .tl { grid-column: 4; font-weight: 700; min-width: 22px; }
+.cf-trucks { display: grid; grid-template-columns: max-content 1fr; gap: 0 10px; align-items: start; }
+.cf-tgrid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(8, auto); grid-auto-flow: column; gap: 3px 14px; }
+.cf-tgrid > div { display: flex; align-items: end; gap: 4px; min-height: 20px; }
+.cf-tgrid i { font-style: normal; font-weight: 700; width: 10px; }
+.cf-tgrid u { flex: 1; }
+.cf-res { margin: 12px 0 6px; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 0 2%; }
+.cf-res u { text-decoration: none; font-weight: 600; }
+.coa-remark { border: 1px dashed var(--line); border-radius: 12px; padding: 8px 10px 2px; margin-top: 6px; }
+.coa-remark-h { display: block; font-weight: 600; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.coa-trucks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.coa-truck { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 8px; border-radius: 10px; background: var(--mango-soft, #fff4e0); font-size: 13px; }
+.coa-truck i { font-style: normal; font-weight: 700; color: var(--muted); }
+.coa-truck small { color: var(--muted); }
+.coa-truck.nod { background: #fdecec; }
+.coa-truck .rm { border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; color: var(--muted); padding: 0 2px; }
 .cf-tab { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .cf-tab th, .cf-tab td { border: 1px solid #000; padding: 4px 4px; text-align: center; font-size: 14.5px; height: 26px; overflow: hidden; }
 .cf-tab th { font-weight: 700; line-height: 1.15; }
@@ -881,7 +905,7 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .rp-empty { text-align: center; color: var(--ink-2); padding: 28px 10px; } .rp-empty img { width: 84px; opacity: .9; display: inline-block; } .rp-empty b { display: block; margin-top: 8px; } .rp-empty span { display: block; font-size: 12.5px; margin-top: 2px; }
 .cf-foot { margin-top: 12px; text-align: right; font-size: 12.5px; }
 .cf.void::after { content: "CANCELLED"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-20deg); font-family: Mitr, sans-serif; font-size: 80px; font-weight: 700; letter-spacing: 6px; color: rgba(229,72,77,.16); pointer-events: none; white-space: nowrap; }
-@media (max-width: 860px) { .coa-layout { grid-template-columns: 1fr; } .coa-lot { grid-template-columns: auto 1fr 28px; grid-template-areas: "no info rm" "bags bags rm" "why why rm"; } .cf-info { grid-template-columns: 1fr; } .cf-info > div:empty { display: none; } }
+@media (max-width: 860px) { .coa-layout { grid-template-columns: 1fr; } .coa-lot { grid-template-columns: auto 1fr 28px; grid-template-areas: "no info rm" "bags bags rm" "why why rm"; } .cf-info { grid-template-columns: 1fr; } .cf-info > div:empty { display: none; } .cf-top, .cf-body { grid-template-columns: 1fr; } .cf-top > div:empty { display: none; } .cf-trucks { margin-top: 6px; } }
 /* print: the certificate must always fit ONE A4 landscape page (route sets @page via views.coa.pageCss) */
 @media print {
   .coa-layout > .panel:first-child, .fl-tabs, .sheet-actions { display: none !important; }
@@ -899,6 +923,8 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
   .cf-info { grid-template-columns: 1.15fr 1fr !important; gap: 1px 18px; }
   .cf-info > div { min-height: 19px; } .cf-info > div:empty { display: block; }
   .cf-res { margin: 6px 0 4px; }
+  .cf-top, .cf-body { grid-template-columns: 1.15fr 1fr !important; gap: 1px 18px; }
+  .cf-top > div, .cf-tgrid > div { min-height: 17px; } .cf-left, .cf-tgrid { row-gap: 1px; }
   .cf-tab th, .cf-tab td { height: 20px; padding: 2px 3px; font-size: 12px; }
   .cf-tab tr.sp td { font-size: 11.5px; }
   .cf-sign { margin: 14px 5% 0 4%; } .cf-sign b { min-height: 18px; }
@@ -2294,12 +2320,19 @@ views.release = {
   },
 };
 
-/* ---------- 3d. coa · Certificate of Analysis (form ML-FM-1610-037 Rev.06) · one record: marketing fills part 1 and saves, QC opens the same record and fills part 2 ---------- */
+/* ---------- 3d. coa · Certificate of Analysis (form ML-FM-1610-037 Rev.07) · one record: marketing fills part 1 and saves, QC opens the same record and fills part 2 ---------- */
 const COA_KEY = { recs: "qc.coa", queue: "qc.coa.queue" };
 const coaRecs = () => JSON.parse(localStorage.getItem(COA_KEY.recs) || "[]");
 const coaSave = recs => localStorage.setItem(COA_KEY.recs, JSON.stringify(recs));
-const COA_COLS = [["color", "Color", "IU"], ["pol", "Polarization", "%"], ["moist", "Moisture", "%"], ["invert", "Invert Sugar", "%"], ["ma", "Target M.A.", "mm"], ["ash", "Conductivity Ash", "%"], ["sed", "Sediment", "ppm"]];
-const COA_METHOD = { color: "ICUMSA GS2/3-10", pol: "ICUMSA GS2/3-1", moist: "ICUMSA GS2/1/3/9-15", invert: "ICUMSA GS2/3/9-5", ma: "ICUMSA GS2/9-37", ash: "ICUMSA GS2/3/9-17", sed: "ICUMSA GS2/3-19" };
+const COA_FORM = "ML-FM-1610-037 Rev.07";
+const COA_COLS = [["color", "Color", "IU"], ["pol", "Polarization", "%"], ["moist", "Moisture", "%"], ["invert", "Invert Sugar", "%"], ["ma", "Target M.A", "mm"], ["ash", "Conductivity Ash", "%"], ["sed", "Sediment", "ppm"]];
+const COA_METHOD = { color: "ICUMSA GS1/3-7(2011)", pol: "ICUMSA GS1/2/3/9-1(2011)", moist: "ICUMSA GS2/1/3-15(2007*)", invert: "Titrimetric", ma: "ICUMSA GS2-37(1994)", ash: "ICUMSA GS1/3/4/7/8-13(1994)", sed: "ICUMSA GS2/3-19(2002)" };
+const COA_MAX_TRUCKS = 16; // Truck No. a–p
+const COA_GRADES = ["DCR Sugar", "VHP Sugar", "Organic Sugar", "White Sugar"];
+const coaGradeOfSugar = s => /DCR/i.test(s) ? "DCR Sugar" : /VHP/i.test(s) ? "VHP Sugar" : /Organic/i.test(s) ? "Organic Sugar" : /ขาว|White/i.test(s) ? "White Sugar" : "";
+// latest delivery record (not draft) of a truck plate — the source for customer / grade / pack / tons / lots on the COA
+const coaDispOf = plate => { const p = String(plate || "").replace(/\s/g, ""); return p ? dpRecs().filter(d => d.status !== "draft" && d.plate && d.plate.replace(/\s/g, "") === p).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.id || 0) - (a.id || 0))[0] || null : null; };
+const coaTrucksOf = r => Array.isArray(r.trucks) ? r.trucks.filter(Boolean) : String(r.truckNo || "").split(/\s*,\s*/).filter(Boolean);
 const COA_STATUS = { new: ["ยังไม่บันทึก", "info"], request: ["รอ QA กรอกผล", "wait"], wait_approve: ["รออนุมัติ", "wait"], issued: ["อนุมัติแล้ว", "ok"], cancelled: ["ยกเลิก", "hold"] };
 const coaVal = (lot, k) => lot[k] === null || lot[k] === undefined ? "" : (k === "color" || k === "sed") ? fmtInt(lot[k]) : k === "invert" || k === "ash" ? fmt(lot[k], 4) : fmt(lot[k], 2);
 // เลข Lot/Strike ที่ "จ่ายออกแล้ว" (มีในบันทึกการจ่ายออกที่ไม่ใช่ร่าง) — ออก COA ได้เฉพาะลอตเหล่านี้
@@ -2327,7 +2360,7 @@ async function coaRefresh() {
 function coaPush(rec) { const recs = coaRecs(); const i = recs.findIndex(x => x.certNo === rec.certNo); if (i >= 0) recs[i] = rec; else recs.push(rec); coaSave(recs); const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q.push({ action: "saveCoa", record: rec }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); return coaFlush(); }
 
 views.coa = {
-  bar: true, title: "ออกใบ COA", sub: "Certificate of Analysis · ML-FM-1610-037 Rev.06", icon: "btn-coa.png", accent: "mango",
+  bar: true, title: "ออกใบ COA", sub: "Certificate of Analysis · " + COA_FORM, icon: "btn-coa.png", accent: "mango",
   pageCss: "@page { size: A4 landscape; margin: 6mm 8mm; }",
   tabs: `<div class="fl-tabs" role="tablist"><button type="button" class="tab on" data-tab="main" role="tab">ใบ COA</button><button type="button" class="tab" data-tab="dash" role="tab">แดชบอร์ดและสรุปรายงาน</button></div>`,
   html: () => `
@@ -2404,8 +2437,8 @@ views.coa = {
     $("#cTabDash").addEventListener("click", e => { const a = e.target.closest("[data-open]"); if (!a) return; e.preventDefault(); const r = coaRecs().find(x => x.certNo === a.dataset.open); if (r) { open(r); renderList(); showTab("main"); } });
     $("#d_print").addEventListener("click", () => window.print());
     $("#d_csv").addEventListener("click", () => {
-      const H = ["Certificate No.", "Date", "Status", "COA Request No.", "Customer", "Truck No.", "Grade", "Lot Number", "Shipment Lot", "Lots certified", "Lots out of spec", "Reporter", "Approved by", "Requested by", "Issued at", "Cancel reason"];
-      const rows = dRecs().map(r => [r.certNo, isoToDmy(r.reqDate), COA_STATUS[stOf(r)][0], r.reqNo, r.customer, r.truckNo, r.grade, r.lotNumber, r.shipmentLot, (r.lots || []).map(l => l.strike).join(" "), (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(" "), r.reporter, r.approvedBy, r.requestedBy, r.issuedAt ? fmtTs(r.issuedAt) : "", r.cancelReason || ""]);
+      const H = ["Certificate No.", "Date", "Status", "COA Request No.", "Customer", "Company of Import", "Truck No.", "Grade", "Lot Number", "Export Invoice NO", "S/O", "Booking", "Packed in", "Ton", "Shipment Lot", "Lots certified", "Lots out of spec", "Reporter", "Approved by", "Requested by", "Issued at", "Cancel reason"];
+      const rows = dRecs().map(r => [r.certNo, isoToDmy(r.reqDate), COA_STATUS[stOf(r)][0], r.reqNo, r.customer, r.importer, coaTrucksOf(r).join(", "), r.grade, r.lotNumber, r.invoiceNo, r.soNo, r.booking, r.packIn, r.packedTons, r.shipmentLot, (r.lots || []).map(l => l.strike).join(" "), (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(" "), r.reporter, r.approvedBy, r.requestedBy, r.issuedAt ? fmtTs(r.issuedAt) : "", r.cancelReason || ""]);
       const csv = "﻿" + [H, ...rows].map(a => a.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `QCTime-COA-${todayIso().replace(/-/g, "")}.csv`; a.click(); toast("⬇ ดาวน์โหลด CSV แล้ว");
     });
@@ -2415,31 +2448,40 @@ views.coa = {
     const stOf = r => r.cancelled ? "cancelled" : r.status || "request";
     const p1Ok = r => !!(r.certNo && r.customer && r.grade);
 
-    /* ---- the paper: form ML-FM-1610-037 Rev.06 (A4 landscape) ---- */
+    /* ---- the paper: form ML-FM-1610-037 Rev.07 (A4 landscape) ---- */
     function sheetHtml(rec) {
       const v = s => s === undefined || s === null || s === "" ? "" : esc(String(s));
       const lots = rec.lots || []; const rows = Math.max(10, lots.length);
       const cell = (l, k) => { const bad = l && l.fails && l.fails.some(f => f.startsWith(PARAM[k])); return `<td class="${bad ? "bad" : ""}">${l ? v(l[k]) : ""}</td>`; };
+      const trucks = coaTrucksOf(rec);
+      const row = (label, sub, val, tail) => sub ? `<span class="lb">${label}</span><span class="sb">${sub}</span><u>${val}</u><span class="tl">${tail || ""}</span>` : `<span class="lb">${label}</span><u class="w">${val}</u>`;
       return `<div class="cf ${rec.cancelled ? "void" : ""}">
-        <div class="cf-head"><img src="assets/mitrlao-logo-coa.jpg" alt="Mitr Lao"><div><b>MITR&nbsp; LAO&nbsp; SUGAR&nbsp; COMPANY LIMITED</b><span>111 Unit 10 Kenghed, Xaybouly District, Savannakhet Province</span><span>Tel : 041 500111 &nbsp;&nbsp; Fax: 041 500555</span></div></div>
+        <div class="cf-head"><img src="assets/mitrlao-logo-coa.jpg" alt="Mitr Lao"><div><b>MITR&nbsp; LAO&nbsp; SUGAR&nbsp; COMPANY LIMITED</b><span>111 Unit 10 Kenghet Village, Xaybouly District, Savannakhet Province, Lao PDR</span><span>Tel : 041 500111 &nbsp;&nbsp; Fax: 041 500555</span></div></div>
         <h2 class="cf-title">CERTIFICATE OF ANALYSIS</h2>
-        <div class="cf-info">
-          <div><span>Date :</span><u>${v(isoToDmy(rec.reqDate))}</u></div><div><span>Certificate No. :</span><u>${v(rec.certNo)}</u></div>
-          <div><span>COA Request No. (ฝกต.) :</span><u>${v(rec.reqNo)}</u></div><div></div>
-          <div><span>Company of Customer Request :</span><u>${v(rec.customer)}</u></div><div><span>Truck No. :</span><u>${v(rec.truckNo)}</u></div>
-          <div><span>Grade of Sugar :</span><u>${v(rec.grade)}</u></div><div></div>
-          <div><span>Lot Number :</span><u>${v(rec.lotNumber)}</u></div><div><span>Shipment Lot Number :</span><u>${v(rec.shipmentLot)}</u></div>
-          <div class="wide"><span>Remark :</span><u>${v(rec.remark)}</u></div>
+        <div class="cf-top"><div><span>Date :</span><u>${v(isoToDmy(rec.reqDate))}</u></div><div><span>Certificate No. :</span><u>${v(rec.certNo)}</u></div></div>
+        <div class="cf-top"><div><span>COA Request No. (ฝกต.) :</span><u>${v(rec.reqNo)}</u></div><div></div></div>
+        <div class="cf-body">
+          <div class="cf-left">
+            ${row("Company of Customer Request :", "", v(rec.customer))}
+            ${row("Company of Import :", "", v(rec.importer))}
+            ${row("Grade of Sugar :", "", v(rec.grade))}
+            ${row("Lot Number :", "", v(rec.lotNumber))}
+            ${row("Remark :", "Export Invoice NO :", v(rec.invoiceNo))}
+            ${row("", "S/O :", v(rec.soNo))}
+            ${row("", "Booking :", v(rec.booking))}
+            ${row("", "PACKED IN " + v(rec.packIn), v(rec.packedTons), "Ton")}
+          </div>
+          <div class="cf-trucks"><span class="lb">Truck No. :</span><div class="cf-tgrid">${Array.from({ length: COA_MAX_TRUCKS }, (_, i) => `<div><i>${String.fromCharCode(97 + i)}</i><u>${v(trucks[i])}</u></div>`).join("")}</div></div>
         </div>
-        <p class="cf-res">Result of analysis follow request items.</p>
+        <div class="cf-res"><b>Result of analysis follow request items.</b><span><b>Shipment Lot Number :</b> <u>${v(rec.shipmentLot) || "-"}</u></span></div>
         <div class="tbl-wrap"><table class="cf-tab"><thead><tr><th>Lot&nbsp; Number</th><th>Production dates</th><th>Best before dates</th>${COA_COLS.map(c => `<th>${c[1]}</th>`).join("")}</tr></thead><tbody>
           ${Array.from({ length: rows }, (_, i) => { const l = lots[i]; return `<tr><td>${l ? v(l.strike) : ""}</td><td>${l ? v(l.prodDate) : ""}</td><td>${l ? v(l.bestBefore) : ""}</td>${COA_COLS.map(c => cell(l, c[0])).join("")}</tr>`; }).join("")}
           <tr class="sp"><td>Specification</td><td></td><td></td>${COA_COLS.map(c => `<td>${v((rec.spec || {})[c[0]])}</td>`).join("")}</tr>
-          <tr class="sp"><td>Method</td><td></td><td></td>${COA_COLS.map(c => `<td>${v((rec.method || {})[c[0]])}</td>`).join("")}</tr>
+          <tr class="sp"><td>Method</td><td>-</td><td>-</td>${COA_COLS.map(c => `<td>${v((rec.method || {})[c[0]])}</td>`).join("")}</tr>
         </tbody></table></div>
         ${rec.cancelled ? `<div class="coa-cancel">CANCELLED · ${esc(rec.cancelReason || "")} · by ${esc(rec.cancelledBy || "")} ${rec.cancelledAt ? fmtTs(rec.cancelledAt) : ""}</div>` : ""}
         <div class="cf-sign"><div><div class="sig-slot">${signatureFor(rec.reporter) ? `<img src="${signatureFor(rec.reporter)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.reporter)}</b><span>Reporter</span></div><div><div class="sig-slot">${signatureFor(rec.approvedBy) ? `<img src="${signatureFor(rec.approvedBy)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.approvedBy)}</b><span>Approved by</span></div></div>
-        <div class="cf-foot">ML-FM-1610-037:27/07/2022 Rev.06</div>
+        <div class="cf-foot">${v(rec.form || COA_FORM)}</div>
       </div>`;
     }
 
@@ -2451,21 +2493,33 @@ views.coa = {
       if (keep && keep.bestBefore) base.bestBefore = keep.bestBefore; if (keep && !lot) { base.prodDate = keep.prodDate || ""; }
       return base;
     }
-    function newRec() { return { certNo: nextCertNo(todayIso()), status: "new", reqDate: todayIso(), reqNo: "", customer: "", truckNo: "", grade: "", lotNumber: "", shipmentLot: "", remark: "", lots: [], spec: {}, method: {}, reporter: "", approvedBy: "", requestedBy: me.name, ts: Date.now() }; }
+    function newRec() { return { form: COA_FORM, certNo: nextCertNo(todayIso()), status: "new", reqDate: todayIso(), reqNo: "", customer: "", importer: "", trucks: [], truckNo: "", grade: "", lotNumber: "", invoiceNo: "", soNo: "", booking: "", packIn: "", packedTons: "", shipmentLot: "", lots: [], spec: {}, method: {}, reporter: "", approvedBy: "", requestedBy: me.name, ts: Date.now() }; }
+    // pull customer / grade / pack / tons / lot numbers from the delivery records of the chosen trucks (fills only what is empty, except tons & lots which follow the trucks)
+    function fillFromTrucks() {
+      const ds = coaTrucksOf(cur).map(coaDispOf).filter(Boolean); cur.truckNo = coaTrucksOf(cur).join(", ");
+      if (!ds.length) return;
+      if (!cur.customer) cur.customer = ds[0].customer || "";
+      if (!cur.grade) cur.grade = coaGradeOfSugar(ds[0].sugarType || "");
+      if (!cur.packIn) cur.packIn = ds[0].pack || "";
+      cur.packedTons = fmt(ds.reduce((s, d) => s + (+d.tons || dpTons(d) || 0), 0), 3);
+      cur.lotNumber = [...new Set(ds.flatMap(d => (d.lots || []).map(l => String(l.no || "").trim()).filter(Boolean)))].join(", ");
+    }
     function open(rec) {
       cur = JSON.parse(JSON.stringify(rec)); if (!cur.status) cur.status = "request"; p1edit = (cur.status === "new"); // saved records open with part-1 locked
-      const sp = specFor(cur); const spec = {}; COA_COLS.forEach(c => spec[c[0]] = (cur.spec && cur.spec[c[0]]) || (sp && sp.rules[c[0]] ? sp.rules[c[0]].text : "")); cur.spec = spec; cur.method = { ...COA_METHOD, ...(cur.method || {}) };
+      cur.trucks = coaTrucksOf(cur); // Rev.06 records kept one truckNo string
+      const frozen = cur.status === "issued" || cur.cancelled; // issued paper keeps the form / methods it was issued with
+      if (!frozen) cur.form = COA_FORM;
+      const sp = specFor(cur); const spec = {}; COA_COLS.forEach(c => spec[c[0]] = (cur.spec && cur.spec[c[0]]) || (sp && sp.rules[c[0]] ? sp.rules[c[0]].text : "")); cur.spec = spec; cur.method = frozen ? { ...COA_METHOD, ...(cur.method || {}) } : { ...COA_METHOD };
       if (cur.lots && cur.lots.length) cur.lots = cur.lots.map(l => lotRow(l.strike, l));
-      else if (cur.status !== "new") { // suggest lots: delivery record of the same truck, else the lot numbers marketing typed
+      else if (cur.status !== "new") { // suggest lots: delivery records of the chosen trucks, else the lot numbers marketing typed
         const dispSet = dispatchedSet();
-        const disp = dpRecs().filter(d => cur.truckNo && d.plate && d.plate.replace(/\s/g, "") === cur.truckNo.replace(/\s/g, "") && d.status !== "draft").sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-        let nos = disp.length ? disp[0].lots.map(l => l.no).filter(Boolean) : []; if (!nos.length) nos = (cur.lotNumber || "").split(/[,\s/]+/).filter(x => /^\d+$/.test(x));
-        nos = nos.filter(n => dispSet.has(String(n))); // เสนอเฉพาะลอตที่จ่ายออกแล้ว
+        let nos = cur.trucks.map(coaDispOf).filter(Boolean).flatMap(d => (d.lots || []).map(l => l.no).filter(Boolean)); if (!nos.length) nos = (cur.lotNumber || "").split(/[,\s/]+/).filter(x => /^\d+$/.test(x));
+        nos = nos.map(String).filter(n => dispSet.has(n)); // เสนอเฉพาะลอตที่จ่ายออกแล้ว
         cur.lots = [...new Set(nos)].map(s => lotRow(s));
       }
       renderEditor(); renderPaper();
     }
-    const toStore = () => { const r = { ...cur, lots: (cur.lots || []).map(l => { const o = { ...l }; delete o.found; delete o.gradeOk; return o; }) }; return r; };
+    const toStore = () => { const r = { ...cur, truckNo: coaTrucksOf(cur).join(", "), tons: +String(cur.packedTons || "").replace(/,/g, "") || 0, lots: (cur.lots || []).map(l => { const o = { ...l }; delete o.found; delete o.gradeOk; return o; }) }; return r; };
     function renderPaper() { $("#c_sheet").innerHTML = cur ? sheetHtml(cur) : `<div class="d-empty"><img src="assets/mascot.png" alt=""><b>เลือกใบ COA หรือกด เพิ่ม COA</b></div>`; $("#c_cancel").classList.toggle("hide", !(cur && cur.status !== "new" && !cur.cancelled && role === "admin")); const pr = $("#c_print"); if (pr) { const canPrint = cur && cur.status === "issued"; pr.disabled = !canPrint; pr.title = canPrint ? "" : "พิมพ์ได้หลังผู้อนุมัติอนุมัติแล้ว"; } }
 
     /* ---- list ---- */
@@ -2491,10 +2545,16 @@ views.coa = {
         <div class="coa-sec"><div class="section-title"><h2>ส่วนที่ 1 · การตลาด</h2><span class="pill ${COA_STATUS[st][1]}">${COA_STATUS[st][0]}</span></div>
           <div class="grid-2">${f("e_date", "Date", `<input class="input" id="e_date" type="date" value="${esc(cur.reqDate)}" data-f="reqDate" ${dis}>`, true)}${f("e_cert", "Certificate No.", `<input class="input" id="e_cert" value="${esc(cur.certNo)}" data-f="certNo" ${saved ? "readonly" : dis}>`, true)}</div>
           ${f("e_reqNo", "COA Request No. (ฝกต.)", `<input class="input" id="e_reqNo" value="${esc(cur.reqNo)}" data-f="reqNo" placeholder="เลขที่คำขอจากฝ่ายการตลาด" ${dis}>`)}
+          ${f("e_truckIn", `Truck No. <small class="muted">(${coaTrucksOf(cur).length}/${COA_MAX_TRUCKS} คัน · เลือกจากบันทึกจ่ายออก)</small>`, `${p1open && coaTrucksOf(cur).length < COA_MAX_TRUCKS ? `<div class="coa-lotadd"><input class="input" id="e_truckIn" list="coaTrucks" placeholder="พิมพ์หรือเลือกทะเบียนรถ" autocomplete="off"><datalist id="coaTrucks">${[...new Map(dpRecs().filter(d => d.status !== "draft" && d.plate).sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(d => [d.plate.replace(/\s/g, ""), d])).values()].filter(d => !coaTrucksOf(cur).some(t => t.replace(/\s/g, "") === d.plate.replace(/\s/g, ""))).slice(0, 300).map(d => `<option value="${esc(d.plate)}">${esc(isoToDmy(d.date))} · ${esc(d.customer || "")} · ${esc(d.sugarType || "")}</option>`).join("")}</datalist><button class="btn sm" id="e_truckAdd" type="button">เพิ่ม</button></div>` : ""}
+            <div class="coa-trucks">${coaTrucksOf(cur).map((t, i) => { const d = coaDispOf(t); return `<span class="coa-truck ${d ? "" : "nod"}"><i>${String.fromCharCode(97 + i)}</i><b>${esc(t)}</b>${d ? `<small>${esc(isoToDmy(d.date))} · ${fmt(+d.tons || dpTons(d), 3)} ตัน</small>` : `<small>ไม่พบในบันทึกจ่ายออก</small>`}${p1open ? `<button type="button" class="rm" data-trm="${i}" aria-label="ลบ">×</button>` : ""}</span>`; }).join("") || `<span class="muted" style="font-size:12.5px">ยังไม่ได้เลือกรถ · เลือกแล้วระบบดึงลูกค้า เกรด บรรจุ น้ำหนัก และ Lot จากบันทึกจ่ายออกให้</span>`}</div>`)}
           ${f("e_cust", "Company of Customer Request", `<input class="input" id="e_cust" list="coaCustomers" value="${esc(cur.customer)}" data-f="customer" placeholder="ชื่อบริษัทลูกค้า" autocomplete="off" ${dis}><datalist id="coaCustomers">${[...new Set((Q.specs || []).map(s => s.name))].map(n => `<option value="${esc(n)}">`).join("")}</datalist>`, true)}
-          <div class="grid-2">${f("e_truck", "Truck No.", `<input class="input" id="e_truck" list="coaTrucks" value="${esc(cur.truckNo)}" data-f="truckNo" placeholder="ทะเบียนรถ" autocomplete="off" ${dis}><datalist id="coaTrucks">${[...new Set(dpRecs().map(d => d.plate).filter(Boolean))].map(p => `<option value="${esc(p)}">`).join("")}</datalist>`)}${f("e_grade", "Grade of Sugar", `<select class="select" id="e_grade" data-f="grade" ${dis}><option value="">— เลือก —</option>${["DCR Sugar", "VHP Sugar", "Organic Sugar", "White Sugar"].map(g => `<option ${g === cur.grade ? "selected" : ""}>${g}</option>`).join("")}</select>`, true)}</div>
-          <div class="grid-2">${f("e_lot", "Lot Number", `<input class="input" id="e_lot" list="coaDispLots" value="${esc(cur.lotNumber)}" data-f="lotNumber" placeholder="เลือกจากลอตที่จ่ายออก เช่น 259, 262" autocomplete="off" ${dis}><datalist id="coaDispLots">${[...dispSet].slice(0, 500).map(n => { const lo = (Q.rows || []).find(r => r.strike === n); return `<option value="${esc(n)}">${lo ? esc(lo.grade) : "จ่ายออกแล้ว"}</option>`; }).join("")}</datalist>`)}${f("e_ship", "Shipment Lot Number", `<input class="input" id="e_ship" value="${esc(cur.shipmentLot)}" data-f="shipmentLot" placeholder="เลข Lot การจัดส่ง" ${dis}>`)}</div>
-          ${f("e_remark", "Remark", `<input class="input" id="e_remark" value="${esc(cur.remark)}" data-f="remark" placeholder="หมายเหตุ" ${dis}>`)}
+          ${f("e_imp", "Company of Import", `<input class="input" id="e_imp" list="coaCustomers" value="${esc(cur.importer || "")}" data-f="importer" placeholder="บริษัทผู้นำเข้า" autocomplete="off" ${dis}>`)}
+          <div class="grid-2">${f("e_grade", "Grade of Sugar", `<select class="select" id="e_grade" data-f="grade" ${dis}><option value="">— เลือก —</option>${COA_GRADES.map(g => `<option ${g === cur.grade ? "selected" : ""}>${g}</option>`).join("")}</select>`, true)}${f("e_lot", "Lot Number", `<input class="input" id="e_lot" list="coaDispLots" value="${esc(cur.lotNumber)}" data-f="lotNumber" placeholder="ดึงจากรถที่เลือก เช่น 259, 262" autocomplete="off" ${dis}><datalist id="coaDispLots">${[...dispSet].slice(0, 500).map(n => { const lo = (Q.rows || []).find(r => r.strike === n); return `<option value="${esc(n)}">${lo ? esc(lo.grade) : "จ่ายออกแล้ว"}</option>`; }).join("")}</datalist>`)}</div>
+          <div class="coa-remark"><span class="coa-remark-h">Remark</span>
+            <div class="grid-2">${f("e_inv", "Export Invoice NO", `<input class="input" id="e_inv" value="${esc(cur.invoiceNo || "")}" data-f="invoiceNo" ${dis}>`)}${f("e_so", "S/O", `<input class="input" id="e_so" value="${esc(cur.soNo || "")}" data-f="soNo" ${dis}>`)}</div>
+            <div class="grid-2">${f("e_book", "Booking", `<input class="input" id="e_book" value="${esc(cur.booking || "")}" data-f="booking" ${dis}>`)}<div class="grid-2">${f("e_pack", "PACKED IN", `<input class="input" id="e_pack" list="coaPacks" value="${esc(cur.packIn || "")}" data-f="packIn" placeholder="เช่น 50 kg" autocomplete="off" ${dis}><datalist id="coaPacks">${DP.PACK.map(p => `<option value="${esc(p)}">`).join("")}</datalist>`)}${f("e_tons", "Ton", `<input class="input" id="e_tons" value="${esc(cur.packedTons || "")}" data-f="packedTons" inputmode="decimal" placeholder="รวมจากรถ" ${dis}>`)}</div></div>
+          </div>
+          ${f("e_ship", "Shipment Lot Number", `<input class="input" id="e_ship" value="${esc(cur.shipmentLot)}" data-f="shipmentLot" placeholder="เลข Lot การจัดส่ง" ${dis}>`)}
           ${p1open
             ? `<div class="row mt"><button class="btn" id="e_save1" type="button">${saved ? "บันทึกส่วนการตลาด" : "บันทึก"}</button>${!saved ? `<button class="btn ghost" id="e_discard" type="button">ยกเลิก</button>` : ""}</div>`
             : saved
@@ -2534,6 +2594,18 @@ views.coa = {
         renderPaper(); const b = $("#e_submit"); if (b) b.disabled = !(cur.lots.length && cur.approvedBy); const s1 = $("#e_save1"); if (s1) s1.disabled = !p1Ok(cur);
       });
       $("#c_editor").addEventListener("click", e => { const b = e.target.closest("[data-rm]"); if (!b || !p2) return; cur.lots.splice(+b.dataset.rm, 1); renderEditor(); renderPaper(); });
+      if (p1open) { // Truck No. a–p: add / remove → refill customer, grade, pack, tons, lots from the delivery records
+        const addTruck = () => {
+          const inp = $("#e_truckIn"); const t = (inp?.value || "").trim(); if (!t) { toast("เลือกทะเบียนรถก่อน"); return; }
+          const ts = coaTrucksOf(cur); if (ts.some(x => x.replace(/\s/g, "") === t.replace(/\s/g, ""))) { toast("รถคันนี้อยู่ในรายการแล้ว"); return; }
+          if (ts.length >= COA_MAX_TRUCKS) { toast(`ใส่ได้สูงสุด ${COA_MAX_TRUCKS} คัน (a–p)`); return; }
+          const d = coaDispOf(t); if (!d) { toast(`ไม่พบรถ <b>${esc(t)}</b> ในบันทึกจ่ายออก`); return; }
+          cur.trucks = [...ts, d.plate]; fillFromTrucks(); renderEditor(); renderPaper(); $("#e_truckIn")?.focus();
+        };
+        $("#e_truckAdd")?.addEventListener("click", addTruck);
+        $("#e_truckIn")?.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addTruck(); } });
+        root.querySelectorAll("#c_editor [data-trm]").forEach(b => b.addEventListener("click", () => { cur.trucks = coaTrucksOf(cur).filter((_, i) => i !== +b.dataset.trm); fillFromTrucks(); renderEditor(); renderPaper(); }));
+      }
       const s1 = $("#e_save1"); if (s1) { s1.disabled = !p1Ok(cur); s1.addEventListener("click", () => {
         if (!p1Ok(cur)) return; const dup = coaRecs().find(r => r.certNo === cur.certNo); if (!saved && dup) { toast(`เลขที่ ${esc(cur.certNo)} มีอยู่แล้ว`); return; }
         if (!saved) { cur.status = "request"; cur.requestedBy = me.name; cur.requestedAt = new Date().toISOString(); }
