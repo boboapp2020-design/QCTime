@@ -263,6 +263,11 @@ const ACTIONS = {
     return { ok: true, value: rcode, date: day };
   },
 
+  async deleteRepack({ db, me, body }) {
+    if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
+    const r = await db.prepare("DELETE FROM repack WHERE strike = ?1 AND day = ?2").bind(String(body.strike || ""), String(body.day || "")).run(); return { ok: true, deleted: r.meta.changes };
+  },
+
   /* one-time import from Google Sheets (admin). Each part is optional; "replace" wipes that table first. */
   async importData({ db, me, body }) {
     if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
