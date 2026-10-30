@@ -515,6 +515,12 @@ body.phone-mode > #app { display: none; }
 .d-results .chip.on { background: var(--sky); border-color: var(--sky); color: #fff; }
 .d-results .chip.hold { color: var(--bad); }
 .d-results .more { font-size: 12px; color: var(--ink-3); white-space: nowrap; align-self: center; }
+.cust-lots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cust-lots button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; font: inherit; font-size: 16px; cursor: pointer; text-align: left; }
+.cust-lots button:hover, .cust-lots button:focus-visible { border-color: var(--sky); background: #f3f9ff; }
+.cust-lots b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.cust-lots i { font-style: normal; font-size: 22px; line-height: 1; color: var(--ink-3); }
+.cust-back { border: 0; background: transparent; color: var(--sky-deep, #1677d8); font: inherit; font-weight: 600; cursor: pointer; padding: 4px 0; margin-bottom: 10px; }
 .d-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 0 34px; }
 @media (max-width: 700px) { .d-groups { grid-template-columns: 1fr; } }
 .d-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; padding-bottom: 12px; border-bottom: 2px solid var(--line); }
@@ -1510,10 +1516,10 @@ views["find-lot"] = {
   init(root, params) {
     const $ = s => root.querySelector(s);
     initChips(root);
-    let selected = null, mode = "search", showFails = !!getSettings().showFails;
+    let selected = null, mode = "search", custOpen = false, showFails = !!getSettings().showFails;
     const allowedTabs = flAllowedTabs(); // per-role access to the find-lot tabs
     const dg = getSettings().defaultGrade; if (dg) root.querySelectorAll("#fGrade .chip").forEach(c => c.classList.toggle("on", c.dataset.value === dg));
-    const showTab = t => { if (!allowedTabs.includes(t)) t = "search"; document.querySelectorAll(".fl-tabs .tab").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }); mode = t === "cust" ? "cust" : "search"; $("#tabSearch").classList.toggle("hide", t !== "search" && t !== "cust"); root.querySelectorAll("#tabSearch .s-only").forEach(e => e.classList.toggle("hide", t === "cust")); root.querySelectorAll("#tabSearch .c-only").forEach(e => e.classList.toggle("hide", t !== "cust")); if (t === "search" || t === "cust") render(); $("#tabDash").classList.toggle("hide", t !== "dash"); $("#tabEdit").classList.toggle("hide", t !== "edit"); if (t === "dash") renderDashboard(root); if (t === "edit") renderEditor(root); };
+    const showTab = t => { if (!allowedTabs.includes(t)) t = "search"; document.querySelectorAll(".fl-tabs .tab").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }); mode = t === "cust" ? "cust" : "search"; custOpen = false; $("#tabSearch").classList.toggle("hide", t !== "search" && t !== "cust"); root.querySelectorAll("#tabSearch .s-only").forEach(e => e.classList.toggle("hide", t === "cust")); root.querySelectorAll("#tabSearch .c-only").forEach(e => e.classList.toggle("hide", t !== "cust")); if (t === "search" || t === "cust") render(); $("#tabDash").classList.toggle("hide", t !== "dash"); $("#tabEdit").classList.toggle("hide", t !== "edit"); if (t === "dash") renderDashboard(root); if (t === "edit") renderEditor(root); };
     initEditor(root);
     root.addEventListener("qc:data", () => { fillCustomers(); render(); if (!$("#tabDash").classList.contains("hide")) renderDashboard(root); });
     document.querySelectorAll(".fl-tabs .tab").forEach(b => { if (!allowedTabs.includes(b.dataset.tab)) { b.remove(); return; } b.addEventListener("click", () => showTab(b.dataset.tab)); });
@@ -1572,8 +1578,12 @@ views["find-lot"] = {
       const banner = custBanner(list);
       if (mode === "cust" && !$("#fCust").value) { el.innerHTML = empty("เลือกลูกค้าเพื่อดู Lot ที่ผ่านเกณฑ์", "ระบบเทียบค่าคุณภาพทุก Lot กับสเปคของลูกค้าใน sheet Spec"); return; }
       if (!r) { el.innerHTML = banner + empty(banner ? "ไม่มี Lot ที่ผ่านเกณฑ์ของลูกค้ารายนี้" : "ไม่พบ Lot ที่ตรงกับเงื่อนไข", banner ? "ลองล้างตัวกรองอื่น หรือเลือกลูกค้ารายอื่น" : "ลองขยายช่วงค่าหรือล้างตัวกรอง"); $("#custClear")?.addEventListener("click", clearCust); return; }
-      const strip = banner + `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
-        `<button type="button" class="chip ${x.strike === selected ? "on" : ""} ${QSTATUS[x.status] === "hold" ? "hold" : ""}" data-s="${esc(x.strike)}">${esc(x.strike)}</button>`).join("")}${list.length > MAX_CHIPS ? `<span class="more">…และอีก ${fmtInt(list.length - MAX_CHIPS)} รายการ ค้นหาให้แคบลง</span>` : ""}</div></div>`;
+      if (mode === "cust" && !custOpen) { // แท็บค้นหาลูกค้า: แสดงเฉพาะเลข Lot เรียงแนวตั้ง กดเข้าไปดูรายละเอียดเอง
+        el.innerHTML = banner + `<ul class="cust-lots">${list.map(x => `<li><button type="button" data-lot="${esc(x.strike)}"><b>${esc(x.strike)}</b><i aria-hidden="true">›</i></button></li>`).join("")}</ul>`;
+        $("#custClear")?.addEventListener("click", clearCust); return;
+      }
+      const strip = banner + (mode === "cust" ? `<button type="button" class="cust-back" id="custBack">‹ กลับรายการ Lot</button>` : `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
+        `<button type="button" class="chip ${x.strike === selected ? "on" : ""} ${QSTATUS[x.status] === "hold" ? "hold" : ""}" data-s="${esc(x.strike)}">${esc(x.strike)}</button>`).join("")}${list.length > MAX_CHIPS ? `<span class="more">…และอีก ${fmtInt(list.length - MAX_CHIPS)} รายการ ค้นหาให้แคบลง</span>` : ""}</div></div>`);
       el.innerHTML = strip + `
         <div class="d-head"><div><small>Strike</small><h2>${esc(r.strike)}</h2></div>${pill(r.status)}</div>
         <div class="d-sub">${esc(r.grade)} · ผลิต ${esc(r.date || "—")} · ฤดู ${esc(r.season || "—")}</div>
@@ -1597,8 +1607,9 @@ views["find-lot"] = {
       el.querySelector(".d-results .chip.on")?.scrollIntoView({ block: "nearest", inline: "center" });
       $("#toggleFails")?.addEventListener("click", () => { showFails = !showFails; renderDetail(list); });
       $("#custClear")?.addEventListener("click", clearCust);
+      $("#custBack")?.addEventListener("click", () => { custOpen = false; render(); });
     }
-    function clearCust() { $("#fCust").value = ""; render(); }
+    function clearCust() { $("#fCust").value = ""; custOpen = false; render(); }
     function render() {
       const list = filtered();
       if (list.length && !list.some(r => r.strike === selected)) selected = list[0].strike;
@@ -1627,13 +1638,13 @@ views["find-lot"] = {
     $("#strikeForm").addEventListener("submit", () => { const s = $("#strike").value.trim(); const hit = Q.rows && Q.rows.find(r => r.strike === s); if (hit) selected = hit.strike; render(); if (hit && window.innerWidth < 860) { const d = $("#detail"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" }); } if (!hit && s && Q.rows) toast(`ไม่พบ Strike <b>${esc(s)}</b> แบบตรงตัว แสดงรายการที่ใกล้เคียงแทน`); });
     $("#strike").addEventListener("input", render);
     ["#cMin", "#cMax", "#mMin", "#mMax"].forEach(s => $(s).addEventListener("input", render));
-    ["#fGrade", "#fStatus", "#fCust"].forEach(s => $(s).addEventListener("change", render));
+    ["#fGrade", "#fStatus"].forEach(s => $(s).addEventListener("change", render)); $("#fCust").addEventListener("change", () => { custOpen = false; render(); });
     $("#clear").addEventListener("click", () => {
       $("#strike").value = ""; ["#cMin", "#cMax", "#mMin", "#mMax"].forEach(s => $(s).value = ""); $("#fCust").value = "";
       root.querySelectorAll("[data-chips]").forEach(g => g.querySelectorAll(".chip").forEach((c, i) => c.classList.toggle("on", i === 0)));
       render();
     });
-    $("#detail").addEventListener("click", e => { const b = e.target.closest(".d-results .chip"); if (!b) return; selected = b.dataset.s; render(); });
+    $("#detail").addEventListener("click", e => { const l = e.target.closest(".cust-lots [data-lot]"); if (l) { selected = l.dataset.lot; custOpen = true; render(); $("#detail").scrollIntoView({ block: "start" }); return; } const b = e.target.closest(".d-results .chip"); if (!b) return; selected = b.dataset.s; render(); });
     $("#reload").addEventListener("click", () => load(true));
     $("#dGrade").addEventListener("change", () => renderDashboard(root));
     $("#dMonth").addEventListener("change", () => renderDashboard(root));
