@@ -665,7 +665,8 @@ body.phone-mode > #app { display: none; }
 .dp-layout { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
 @media (max-width: 900px) { .dp-layout { grid-template-columns: 1fr; } }
 .dp-tools { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
-.dp-tools .search { flex: 1; width: auto; }
+.dp-tools .search { flex: 1; width: auto; min-width: 0; } .dp-tools .search input { min-width: 0; width: 100%; }
+.dp-tools #dpNew { flex: none; white-space: nowrap; padding: 9px 14px; font-size: 14.5px; border-radius: 12px; } /* ปุ่มเล็ก บรรทัดเดียว */
 .dp-kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
 .dp-kpis:empty { display: none; }
 .dp-kpis div { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 12px; }
@@ -1135,7 +1136,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
   function open(el) {
     const dl = document.getElementById(el.dataset.combo); if (!dl) return;
     const q = el.value.trim().toLowerCase();
-    const opts = [...dl.options].map(o => ({ v: o.value, l: o.textContent.trim() !== o.value ? o.textContent.trim() : "" })).filter(o => o.v && (!q || o.v.toLowerCase().includes(q) || o.l.toLowerCase().includes(q)));
+    const pre = el.hasAttribute("data-combo-prefix"); // data-combo-prefix = ค้นจากตัวแรก (พิมพ์เลขทีละตัว รายการแคบลงเรื่อยๆ)
+    const opts = [...dl.options].map(o => ({ v: o.value, l: o.textContent.trim() !== o.value ? o.textContent.trim() : "" })).filter(o => o.v && (!q || (pre ? o.v.toLowerCase().startsWith(q) : o.v.toLowerCase().includes(q) || o.l.toLowerCase().includes(q))));
     if (!opts.length || (opts.length === 1 && opts[0].v === el.value)) { close(); return; }
     if (!box) { box = document.createElement("ul"); box.className = "combo-pop"; box.setAttribute("role", "listbox"); document.body.appendChild(box); box.addEventListener("mousedown", e => { const li = e.target.closest("li"); e.preventDefault(); if (li) pick(li.dataset.v); }); }
     inp = el; idx = -1;
@@ -2339,15 +2341,13 @@ views.release = {
         <div class="dp-wiz-foot">${editUid && role === "admin" ? `<button type="button" class="btn ghost danger" id="w_delete">🗑 ลบบันทึก</button>` : ""}<button type="button" class="btn ghost" id="w_saveExit">บันทึกร่างไว้ก่อน</button><button type="button" class="btn" id="w_next">${step < 3 ? "ต่อไป" : "สรุปข้อมูล"}</button></div>`;
     }
     const gradeOfSugar = s => /VHP/i.test(s) ? "VHP" : /DCR/i.test(s) ? "DCR" : /Organic/i.test(s) ? "Organic" : /ขาว|White/i.test(s) ? "White" : "";
-    function lotOptions(selected) { // เลือกได้เฉพาะ Lot ที่ผ่านและมีในชีต Quality เท่านั้น (กรองตามชนิดน้ำตาลที่เลือก)
+    function lotOptions() { // รายการ Lot ให้ช่องพิมพ์ค้นหา: เฉพาะ Lot ที่ผ่านและมีในฐานข้อมูล (กรองตามชนิดน้ำตาลที่เลือก)
       const g = gradeOfSugar(draft.sugarType || "");
       const rows = (Q.rows || []).filter(r => r.status === "ผ่าน" && (!g || r.grade === g));
-      const has = rows.some(r => r.strike === String(selected));
-      const extra = (selected && !has) ? `<option value="${esc(selected)}" selected>${esc(selected)} (ไม่พบในฐานข้อมูล)</option>` : "";
-      return `<option value="">— เลือก Lot —</option>${extra}` + rows.slice(0, 800).map(r => `<option value="${esc(r.strike)}" ${r.strike === String(selected) ? "selected" : ""}>${esc(r.strike)} · ${esc(r.grade)} · สี ${fmtN(r.color, 0)} · ${esc(r.date)}</option>`).join("");
+      return `<datalist id="dpLotList">${rows.map(r => `<option value="${esc(r.strike)}">${esc(r.grade)} · สี ${fmtN(r.color, 0)} · ผลิต ${esc(r.date)}</option>`).join("")}</datalist>`;
     }
     function lotsHtml() {
-      const d = draft; return d.lots.map((l, i) => `<div class="lot-row" data-i="${i}"><span class="n">${i + 1}</span><select class="select lotno">${lotOptions(l.no)}</select><div class="lot-r"><label class="rlbl"><input type="checkbox" class="rchk" ${l.r ? "checked" : ""}> R</label>${l.r ? `<input class="input rnum" type="number" inputmode="numeric" value="${esc(l.rNum || "")}" placeholder="เลข">` : ""}</div><div class="bags"><input class="input" type="number" inputmode="numeric" min="0" value="${esc(l.bags)}" placeholder="0"><small>กระสอบ</small></div><button type="button" class="rm" aria-label="ลบ">×</button></div>`).join("");
+      const d = draft; return d.lots.map((l, i) => `<div class="lot-row" data-i="${i}"><span class="n">${i + 1}</span><input class="input lotno" data-combo="dpLotList" data-combo-prefix value="${esc(l.no || "")}" placeholder="พิมพ์เลข Lot" inputmode="numeric" autocomplete="off" aria-label="เลข Lot"><div class="lot-r"><label class="rlbl"><input type="checkbox" class="rchk" ${l.r ? "checked" : ""}> R</label>${l.r ? `<input class="input rnum" type="number" inputmode="numeric" value="${esc(l.rNum || "")}" placeholder="เลข">` : ""}</div><div class="bags"><input class="input" type="number" inputmode="numeric" min="0" value="${esc(l.bags)}" placeholder="0"><small>กระสอบ</small></div><button type="button" class="rm" aria-label="ลบ">×</button></div>`).join("") + lotOptions();
     }
     function lotStats() { const d = draft; $("#lotsum").innerHTML = `<div><b>${d.lots.length}</b><span>Lot</span></div><div><b>${fmtInt(dpBags(d))}</b><span>กระสอบ</span></div>`; d.tons = dpTons(d); const t = $("#w_tons"); if (t) t.value = fmt(d.tons, 3) + " ตัน"; }
 
@@ -2437,7 +2437,7 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
           const lotsEl = $("#dpLots"); lotsEl.innerHTML = lotsHtml(); lotStats();
           lotsEl.addEventListener("input", e => { const row = e.target.closest(".lot-row"); if (!row) return; const i = +row.dataset.i; if (e.target.classList.contains("lotno")) draft.lots[i].no = e.target.value.trim(); else if (e.target.classList.contains("rnum")) draft.lots[i].rNum = e.target.value.trim(); else if (e.target.classList.contains("rchk")) return; else draft.lots[i].bags = e.target.value.trim(); lotStats(); saveDraftState(); });
           lotsEl.addEventListener("click", e => { const row = e.target.closest(".lot-row"); if (!row) return; const i = +row.dataset.i; if (e.target.classList.contains("rchk")) { draft.lots[i].r = e.target.checked; } else if (e.target.closest(".rm")) { draft.lots.splice(i, 1); if (!draft.lots.length) draft.lots.push({ no: "", bags: "", r: false, rNum: "" }); } else return; lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); });
-          $("#w_addLot").addEventListener("click", () => { readStep(); draft.lots.push({ no: "", bags: "", r: false, rNum: "" }); lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); lotsEl.lastElementChild.querySelector(".lotno").focus(); });
+          $("#w_addLot").addEventListener("click", () => { readStep(); draft.lots.push({ no: "", bags: "", r: false, rNum: "" }); lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); [...lotsEl.querySelectorAll(".lot-row .lotno")].pop()?.focus(); });
           $("#w_pack").addEventListener("change", () => { draft.pack = $("#w_pack").value; lotStats(); });
           $("#w_sugarType").addEventListener("change", () => { draft.sugarType = $("#w_sugarType").value; draft.lots.forEach(l => { if (l.no && !(Q.rows || []).some(r => r.status === "ผ่าน" && r.strike === String(l.no) && r.grade === gradeOfSugar(draft.sugarType))) l.no = ""; }); lotsEl.innerHTML = lotsHtml(); lotStats(); saveDraftState(); });
         }
@@ -2988,7 +2988,8 @@ views.settings = {
       <section class="scard" id="s-data">
         <div class="shead"><span class="sico big">${SICON.sheet}</span><div class="stitle"><h2>ฐานข้อมูล</h2><small>Cloudflare D1 · ข้อมูลทั้งหมดของแอปเก็บที่นี่</small></div><span class="pill info" id="dbPill" style="margin-left:auto">กำลังตรวจ…</span></div>
         ${srow("info", "ข้อมูลในฐานข้อมูล", "", `<span class="sval" id="dbCounts">—</span>`)}
-        ${srow("upload", "นำเข้าจาก Google Sheets", "คัดลอก Quality, Spec, Users, บันทึกจ่ายออก, ใบ COA และ Repack จากระบบเดิม (ข้อมูลในชีตไม่ถูกลบ)", `<button class="btn sm ghost" id="impBtn" type="button">นำเข้าข้อมูล</button>`)}
+        ${srow("sync", "อัปเดต Lot และสเปคจาก Google Sheets", "ใช้เมื่อแก้ข้อมูลคุณภาพหรือสเปคในชีต Quality / Spec แล้วต้องการให้แอปเห็นตาม (ไม่แตะผู้ใช้ บันทึกจ่ายออก และ COA)", `<button class="btn sm" id="impLotsBtn" type="button">อัปเดต Lot และสเปค</button>`)}
+        ${srow("upload", "นำเข้าทั้งหมดจาก Google Sheets", "Lot, สเปค, ผู้ใช้ใหม่, บันทึกจ่ายออก และใบ COA จากระบบเดิม (ไม่เปลี่ยนรหัสผ่านของบัญชีที่มีอยู่ · ข้อมูลในชีตไม่ถูกลบ)", `<button class="btn sm ghost" id="impBtn" type="button">นำเข้าทั้งหมด</button>`)}
         <pre class="slog hide" id="impLog"></pre>
         ${srow("upload", "Export สำหรับ Audit", "ไฟล์ Excel: สรุป · บันทึกจ่ายออก (ครบทุกช่อง) · Lot ที่จ่ายออก · ใบ COA · ผลวิเคราะห์ COA · ประวัติการทำงาน", `<div class="srow-btns au-range"><input class="input" id="auFrom" type="date" aria-label="ตั้งแต่วันที่"><span>–</span><input class="input" id="auTo" type="date" aria-label="ถึงวันที่"><button class="btn sm" id="auBtn" type="button">⬇ Export</button></div>`, "wide")}
         ${srow("sync", "การแก้ไข Lot ที่รอส่ง", "แก้ไขตอนออฟไลน์ จะส่งขึ้นฐานข้อมูลเมื่อออนไลน์", `<div class="row"><b id="pendingN" class="num"></b><button class="btn sm ghost" id="syncBtn" type="button">ส่งตอนนี้</button></div>`)}
@@ -3149,14 +3150,16 @@ views.settings = {
         $("#dbCounts").textContent = `${fmtInt(c.lots || 0)} Lot · ${fmtInt(c.specs || 0)} สเปค · ${fmtInt(c.users || 0)} ผู้ใช้ · ${fmtInt(c.dispatch || 0)} จ่ายออก · ${fmtInt(c.coa || 0)} COA`;
       } catch (e) { $("#dbPill").className = "pill hold"; $("#dbPill").textContent = "เชื่อมต่อไม่ได้"; $("#dbCounts").textContent = e.message; }
     }
-    $("#impBtn").addEventListener("click", async () => {
-      if (!confirm("นำเข้าข้อมูลจาก Google Sheets เข้าฐานข้อมูล Cloudflare?\n\n• Quality และ Spec จะแทนที่ข้อมูลในฐานข้อมูลทั้งหมด\n• ผู้ใช้ จะใช้รหัสผ่านตามชีต Users\n• ข้อมูลในชีตไม่ถูกลบ")) return;
-      const logEl = $("#impLog"), btn = $("#impBtn"); logEl.classList.remove("hide"); logEl.textContent = ""; btn.disabled = true;
+    const runImport = async (btn, opts, question) => {
+      if (!confirm(question)) return;
+      const logEl = $("#impLog"); logEl.classList.remove("hide"); logEl.textContent = ""; root.querySelectorAll("#impBtn, #impLotsBtn").forEach(b => b.disabled = true);
       const log = t => { logEl.textContent += t + "\n"; logEl.scrollTop = logEl.scrollHeight; };
-      try { await importFromSheets(log); log("✓ เสร็จแล้ว"); toast("<b>นำเข้าข้อมูลเสร็จแล้ว</b>", 3000); localStorage.removeItem("qc.quality"); Q.rows = null; Q.specs = null; dbStatus(); loadUsers(); loadSpecs(); }
+      try { await importFromSheets(log, opts); log("✓ เสร็จแล้ว"); toast(`<b>${opts.lotsOnly ? "อัปเดต Lot และสเปคแล้ว" : "นำเข้าข้อมูลเสร็จแล้ว"}</b>`, 3000); localStorage.removeItem("qc.quality"); Q.rows = null; Q.specs = null; dbStatus(); loadUsers(); loadSpecs(); }
       catch (e) { log("✕ หยุด: " + e.message); toast(`<b>นำเข้าไม่สำเร็จ</b> ${esc(e.message)}`, 4000); }
-      finally { btn.disabled = false; }
-    });
+      finally { root.querySelectorAll("#impBtn, #impLotsBtn").forEach(b => b.disabled = false); }
+    };
+    $("#impLotsBtn").addEventListener("click", e => runImport(e.currentTarget, { lotsOnly: true }, "อัปเดต Lot และสเปคลูกค้าจาก Google Sheets?\n\n• ข้อมูล Lot และสเปคในฐานข้อมูลจะถูกแทนที่ด้วยข้อมูลในชีต\n• Lot ที่แก้ไขในแอปแต่ไม่ได้แก้ในชีต จะกลับเป็นค่าตามชีต\n• ไม่แตะผู้ใช้ บันทึกจ่ายออก ใบ COA และ Repack ที่บันทึกในแอป"));
+    $("#impBtn").addEventListener("click", e => runImport(e.currentTarget, {}, "นำเข้าข้อมูลทั้งหมดจาก Google Sheets?\n\n• Lot และสเปคจะแทนที่ข้อมูลในฐานข้อมูล\n• ผู้ใช้: เพิ่มเฉพาะบัญชีที่ยังไม่มี (ไม่เปลี่ยนรหัสของบัญชีเดิม)\n• บันทึกจ่ายออก / ใบ COA จากระบบเดิม: เพิ่มหรือแทนที่ตามเลขที่\n• ข้อมูลในชีตไม่ถูกลบ"));
     // ค่าเริ่มต้น: ตั้งแต่ 1 ธ.ค. ของฤดูหีบล่าสุด ถึงวันนี้
     { const d = new Date(); const y = d.getMonth() >= 11 ? d.getFullYear() : d.getFullYear() - 1; $("#auFrom").value = `${y}-12-01`; $("#auTo").value = todayIso(); }
     $("#auBtn").addEventListener("click", async () => {
@@ -3179,7 +3182,8 @@ views.settings = {
 };
 
 /* ---------- one-time import: Google Sheets / Apps Script (ระบบเดิม) → Cloudflare D1 ---------- */
-async function importFromSheets(log) {
+// opts.lotsOnly = อัปเดตเฉพาะ Lot + สเปค + Repack (ไม่แตะผู้ใช้ / บันทึกจ่ายออก / COA)
+async function importFromSheets(log, opts = {}) {
   const oldGet = async q => { const r = await fetch(OLD_SCRIPT_URL + "?" + q + "&_=" + Date.now()); return r.json(); };
   log("อ่านชีต Quality และ Spec …");
   const [qt, st] = await Promise.all([fetchSheet(SHEET_DEFAULT.quality), fetchSheet(SHEET_DEFAULT.spec)]);
@@ -3197,12 +3201,14 @@ async function importFromSheets(log) {
   for (const strike of withRepack) { try { const j = await oldGet("action=getRepack&strike=" + encodeURIComponent(strike)); (j.records || []).forEach(x => { if (/^\d{4}-\d{2}-\d{2}$/.test(x.date)) repack.push({ strike, day: x.date, rcode: x.value }); }); } catch (e) { log(`  ข้าม Repack ของ Lot ${strike}: ${e.message}`); } }
   if (repack.length) await postApi({ action: "importData", repack }); log(`  Repack ${repack.length} รายการ จาก ${withRepack.length} Lot`);
 
+  if (opts.lotsOnly) return;
   log("อ่านชีต Users …");
   try {
     const ut = await fetchSheet("Users"); const ul = ut.cols.map(c => (c.label || "").trim()); const g = (r, n) => { const i = ul.indexOf(n); return i >= 0 && r.c[i] ? String(r.c[i].f ?? r.c[i].v ?? "").trim() : ""; };
     const us = ut.rows.map(r => ({ user: g(r, "Username"), pass: g(r, "Password"), name: g(r, "Name"), role: g(r, "Role"), active: !/^(N|FALSE)$/i.test(g(r, "Active")) })).filter(u => u.user && u.pass);
-    for (let i = 0; i < us.length; i += 4) await postApi({ action: "importData", users: us.slice(i, i + 4) }); // ทีละน้อย เพราะการเข้ารหัสรหัสผ่านใช้ CPU
-    log(`  ผู้ใช้ ${us.length} คน (ใช้รหัสผ่านตามชีต)`);
+    const have = new Set((await postApi({ action: "listUsers" })).users.map(u => u.user)); const fresh = us.filter(u => !have.has(u.user.toLowerCase())); // ไม่ทับบัญชีที่มีอยู่แล้ว (กันรีเซ็ตรหัสที่ผู้ใช้เปลี่ยนในแอป)
+    for (let i = 0; i < fresh.length; i += 4) await postApi({ action: "importData", users: fresh.slice(i, i + 4) }); // ทีละน้อย เพราะการเข้ารหัสรหัสผ่านใช้ CPU
+    log(`  ผู้ใช้ใหม่ ${fresh.length} คน (ข้าม ${us.length - fresh.length} คนที่มีอยู่แล้ว)`);
   } catch (e) { log("  อ่านชีต Users ไม่ได้ (" + e.message + ") — ใช้ผู้ใช้และรหัสผ่านเริ่มต้นในฐานข้อมูลแทน"); }
 
   log("อ่านบันทึกจ่ายออกและใบ COA จากสคริปต์เดิม …");
