@@ -1001,6 +1001,8 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .srow-btns { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .set-wrap { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: start; }
 .set-wrap.solo { grid-template-columns: 1fr; max-width: 640px; margin: 0 auto; }
+.s-tbl { padding: 0 14px 14px; } .s-tbl .ctab td.r { text-align: right; } .s-tbl .mono { font-variant-numeric: tabular-nums; }
+.slog { margin: 0 22px 12px; padding: 10px 12px; max-height: 220px; overflow: auto; border-radius: 12px; background: var(--paper-2); font: 12.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--ink-2); }
 .set-nav { position: sticky; top: 76px; display: grid; gap: 4px; padding: 8px; border-radius: 20px; background: rgba(255,253,248,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-panel); }
 .set-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; color: var(--ink-2); text-decoration: none; transition: background .15s, color .15s; }
 .set-nav a svg { width: 18px; height: 18px; flex: none; }
@@ -1153,41 +1155,38 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
 })();
 const lotByNo = no => LOTS.find(l => l.no === no);
 const getUser = () => JSON.parse(localStorage.getItem("qc.user") || "null") || { name: "สุรศักดิ์", role: "QC" };
-// Prototype accounts — replace with the Users sheet via Apps Script when connected
-// Local fallback copy of the Users sheet (used when Apps Script is unreachable or not yet updated)
+// รายชื่อผู้ใช้ (ไม่มีรหัสผ่าน) — ใช้แสดงชื่อ / ไอคอน / รายชื่อผู้อนุมัติ / ลายเซ็น ; การล็อกอินและสิทธิ์ตรวจที่เซิร์ฟเวอร์ (Cloudflare D1)
 const USERS = [
-  { user: "wh01",      pass: "1234", name: "พนักงานคลังสินค้า",          role: "คลังสินค้า" },
-  { user: "qc01",      pass: "1234", name: "นางสุกสะหวัน จันทะวง",        role: "QC" },
-  { user: "qc02",      pass: "1234", name: "ท้าวพวงมะไล สุลิยะจันโท",     role: "QC" },
-  { user: "qc03",      pass: "1234", name: "นางสุงา ไชยะลาด",             role: "QC" },
-  { user: "qc04",      pass: "1234", name: "นางลำดวน แก้วบัวเงิน",        role: "QC" },
-  { user: "qc05",      pass: "1234", name: "นางสุดสะดา สีวงดาว",          role: "QC" },
-  { user: "qc06",      pass: "1234", name: "ท้าวชมมะนา ชุมพนพักดี",       role: "QC" },
-  { user: "qa01",      pass: "1234", name: "ท้าววงปะเสิด สีลาพม",         role: "QA" },
-  { user: "qa02",      pass: "1234", name: "นางอำไพพอน สุวินคำ",          role: "QA" },
-  { user: "qa03",      pass: "1234", name: "นางคำเพีด พมมะสาน",           role: "QA" },
-  { user: "ap01",      pass: "1234", name: "ท้าวคำตัน สอนพุกปะเสิด",      role: "ผู้อนุมัติ" },
-  { user: "ap02",      pass: "1234", name: "ท้าวพูโขง เข็มมะวง",          role: "ผู้อนุมัติ" },
-  { user: "sa01",      pass: "1234", name: "พนักงานฝ่ายขาย",             role: "ฝ่ายขาย" },
-  { user: "pa01",      pass: "1234", name: "พนักงานแพ็ค (Repack)",       role: "แพ็ค" },
-  { user: "admin",     pass: "9999", name: "ຜູ້ດູແລລະບົບ",                role: "ผู้ดูแลระบบ" },
+  { user: "wh01",  name: "พนักงานคลังสินค้า",          role: "คลังสินค้า" },
+  { user: "qc01",  name: "นางสุกสะหวัน จันทะวง",        role: "QC" },
+  { user: "qc02",  name: "ท้าวพวงมะไล สุลิยะจันโท",     role: "QC" },
+  { user: "qc03",  name: "นางสุงา ไชยะลาด",             role: "QC" },
+  { user: "qc04",  name: "นางลำดวน แก้วบัวเงิน",        role: "QC" },
+  { user: "qc05",  name: "นางสุดสะดา สีวงดาว",          role: "QC" },
+  { user: "qc06",  name: "ท้าวชมมะนา ชุมพนพักดี",       role: "QC" },
+  { user: "qa01",  name: "ท้าววงปะเสิด สีลาพม",         role: "QA" },
+  { user: "qa02",  name: "นางอำไพพอน สุวินคำ",          role: "QA" },
+  { user: "qa03",  name: "นางคำเพีด พมมะสาน",           role: "QA" },
+  { user: "ap01",  name: "ท้าวคำตัน สอนพุกปะเสิด",      role: "ผู้อนุมัติ" },
+  { user: "ap02",  name: "ท้าวพูโขง เข็มมะวง",          role: "ผู้อนุมัติ" },
+  { user: "sa01",  name: "พนักงานฝ่ายขาย",             role: "ฝ่ายขาย" },
+  { user: "pa01",  name: "พนักงานแพ็ค (Repack)",       role: "แพ็ค" },
+  { user: "admin", name: "ຜູ້ດູແລລະບົບ",                role: "ผู้ดูแลระบบ" },
 ];
-// Ask the Apps Script to verify a login against the Users sheet; null = server not available / not updated -> use local list
+// ล็อกอินกับเซิร์ฟเวอร์ → { ok, user, token } ; null = ติดต่อเซิร์ฟเวอร์ไม่ได้
 async function serverLogin(u, p) {
-  const url = (getSettings().api || "").trim() || API_DEFAULT; if (!url) return null;
   try {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "login", user: u, pass: p }) });
+    const res = await fetch(apiUrl(), { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "login", user: u, pass: p }) });
     const j = await res.json();
-    if (j.ok) return { ok: true, user: j.user };
-    if (/unknown action/i.test(j.error || "")) return null;
+    if (j.ok) return { ok: true, user: j.user, token: j.token };
     return { ok: false, error: j.error || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" };
   } catch (e) { return null; }
 }
 const getSettings = () => JSON.parse(localStorage.getItem("qc.settings") || "{}");
 // Session: remembered logins live in localStorage, others only for this tab
-const getSession = () => JSON.parse(localStorage.getItem("qc.session") || sessionStorage.getItem("qc.session") || "null");
-function setSession(user, remember) {
-  const s = JSON.stringify({ name: user.name, role: user.role, at: Date.now() });
+const getSession = () => { const s = JSON.parse(localStorage.getItem("qc.session") || sessionStorage.getItem("qc.session") || "null"); return s && s.token ? s : null; }; // เซสชันแบบเก่า (ไม่มี token) = ต้องล็อกอินใหม่
+function setSession(user, remember, token) {
+  const s = JSON.stringify({ name: user.name, role: user.role, user: user.user, token: token || "", at: Date.now() });
   localStorage.removeItem("qc.session"); sessionStorage.removeItem("qc.session");
   (remember ? localStorage : sessionStorage).setItem("qc.session", s);
   localStorage.setItem("qc.user", JSON.stringify({ name: user.name, role: user.role }));
@@ -1266,7 +1265,7 @@ function barHtml({ title, sub, icon, tabs }) {
     </div>
   </div></header>`;
 }
-function logout() { clearSession(); toast("<b>ออกจากระบบแล้ว</b>"); location.hash = "#/login"; }
+function logout() { const t = authToken(); if (t) fetch(apiUrl(), { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8", Authorization: "Bearer " + t }, body: JSON.stringify({ action: "logout" }) }).catch(() => {}); clearSession(); toast("<b>ออกจากระบบแล้ว</b>"); location.hash = "#/login"; }
 function sheetHead(dept, label, id) {
   return `<div class="sheet-head">
     <div class="co">${ICON.leaf.replace("<svg", '<svg class="leaf"')}<div><b>Mitr Lao Sugar Co., Ltd.</b><small>${dept}</small></div></div>
@@ -1414,28 +1413,14 @@ views.login = {
       if (!u) { shake(lu.closest(".lf-input")); lu.focus(); toast("กรอกชื่อผู้ใช้ก่อน"); return; }
       if (!p) { shake(lp.closest(".lf-input")); lp.focus(); toast("กรอกรหัสผ่านก่อน"); return; }
       const remember = rem.getAttribute("aria-pressed") === "true";
-      const local = USERS.find(a => a.user === u.toLowerCase() && a.pass === p);
-      if (local) {
-        // Known account: sign in right away, then let the Users sheet confirm in the background
-        setSession({ name: local.name, role: local.role }, remember); localStorage.setItem("qc.lastUser", u);
-        toast(`<b>ยินดีต้อนรับ</b> ${esc(local.name)}`); location.hash = "#/";
-        serverLogin(u, p).then(sv => {
-          if (!sv) return;
-          if (!sv.ok) { clearSession(); location.hash = "#/login"; toast(`<b>ออกจากระบบ</b> ชีต Users แจ้งว่า ${esc(sv.error)}`, 4000); return; }
-          if (sv.user && (sv.user.name !== local.name || sv.user.role !== local.role)) { setSession({ name: sv.user.name, role: sv.user.role }, remember); const chip = app.querySelector(".user-chip"); if (chip) { chip.querySelector(".avatar").textContent = sv.user.name.slice(0, 1); chip.querySelector("span:last-child").textContent = sv.user.name; } }
-        });
-        return;
-      }
       const btn = $(".lf-submit"), lbl = btn.querySelector(".txt"); btn.disabled = true; btn.classList.add("busy"); lbl.textContent = "กำลังตรวจสอบ…";
       const sv = await serverLogin(u, p); btn.disabled = false; btn.classList.remove("busy"); lbl.textContent = "เข้าสู่ระบบ";
-      let acc = null;
-      if (sv && sv.ok) acc = sv.user;
-      else if (sv && !sv.ok) { shake(lp.closest(".lf-input")); lp.value = ""; lp.focus(); toast(`<b>เข้าสู่ระบบไม่ได้</b> ${esc(sv.error)}`); return; }
-      if (!acc) { shake(lp.closest(".lf-input")); lp.value = ""; lp.focus(); toast("<b>เข้าสู่ระบบไม่ได้</b> ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"); return; }
-      const user = { name: acc.name, role: acc.role };
-      setSession(user, remember);
-      localStorage.setItem("qc.lastUser", u);
-      toast(`<b>ยินดีต้อนรับ</b> ${esc(user.name)}`);
+      if (!sv) { toast("<b>เข้าสู่ระบบไม่ได้</b> ติดต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่", 3600); return; }
+      if (!sv.ok) { shake(lp.closest(".lf-input")); lp.value = ""; lp.focus(); toast(`<b>เข้าสู่ระบบไม่ได้</b> ${esc(sv.error)}`); return; }
+      setSession(sv.user, remember, sv.token);
+      localStorage.setItem("qc.lastUser", sv.user.user || u.toLowerCase());
+      Q.rows = null; Q.specs = null; // โหลดข้อมูลใหม่ตามสิทธิ์ของผู้ใช้คนนี้
+      toast(`<b>ยินดีต้อนรับ</b> ${esc(sv.user.name)}`);
       location.hash = "#/";
     });
   },
@@ -1443,9 +1428,19 @@ views.login = {
 
 /* ---------- 3b. find lot (live data from Google Sheets · sheets "Quality" + "Spec") ---------- */
 const SHEET_DEFAULT = { id: "1_7BJbr9vEnbTfp5qdEFcF-3DLY3y65lXqitkx7nQZMw", quality: "Quality", spec: "Spec" };
-// Apps Script Web App (write-back). Deployed by QC on 13 Sep 2026; can be overridden in Settings.
-const API_DEFAULT = "https://script.google.com/macros/s/AKfycbwxKdA4Qn9zWbS4n8zFT-0AAxy0ZWgmIkrhEyRpVVZcs4OMebFqkA8pElUxWCNfyNpbYw/exec";
-const apiUrl = () => ((getSettings().api || "").trim() || API_DEFAULT);
+// ระบบเดิม (Google Sheets + Apps Script) — ใช้เฉพาะตอนนำเข้าข้อมูลครั้งแรกในหน้า ตั้งค่า
+const OLD_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwxKdA4Qn9zWbS4n8zFT-0AAxy0ZWgmIkrhEyRpVVZcs4OMebFqkA8pElUxWCNfyNpbYw/exec";
+// ฐานข้อมูลปัจจุบัน: Cloudflare D1 ผ่าน Pages Functions (/api). เปิดจากโดเมนอื่น (github.io / localhost) จะเรียก API ตัวจริงที่ pages.dev
+const API_DEFAULT = /\.pages\.dev$/.test(location.hostname) ? location.origin + "/api" : "https://qctime.pages.dev/api";
+const apiUrl = () => API_DEFAULT;
+const authToken = () => (getSession() || {}).token || "";
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, { ...opts, headers: { ...(opts.headers || {}), Authorization: "Bearer " + authToken() } });
+  if (res.status === 401) onAuthLost();
+  return res;
+}
+// เซสชันหมดอายุ / ถูกปิดบัญชี / รหัสถูกรีเซ็ต → กลับไปหน้าเข้าสู่ระบบ
+function onAuthLost() { if (!getSession()) return; clearSession(); toast("<b>กรุณาเข้าสู่ระบบใหม่</b> เซสชันหมดอายุหรือถูกเปลี่ยนรหัสผ่าน", 4000); location.hash = "#/login"; }
 // Sheet settings come from the settings page; defaults above are the QC Time spreadsheet
 const sheetCfg = () => { const s = getSettings(); const m = String(s.sheetId || "").match(/[-\w]{25,}/); return { id: m ? m[0] : SHEET_DEFAULT.id, quality: (s.qualitySheet || "").trim() || SHEET_DEFAULT.quality, spec: (s.specSheet || "").trim() || SHEET_DEFAULT.spec, cacheMs: (Number(s.cacheMin) > 0 ? Number(s.cacheMin) : 10) * 60000 }; };
 const Q = { rows: null, specs: null, at: null, from: "" };
@@ -1521,13 +1516,18 @@ function fetchSheet(name) {
     document.head.appendChild(s);
   });
 }
+// แถว/สเปคจากฐานข้อมูล → รูปแบบเดียวกับที่แอปใช้ (dk สำหรับเรียงวันที่, rules แปลงจากข้อความสเปค)
+const fromDbRow = r => ({ ...r, strikeN: r.strikeN ?? num(r.strike), dk: r.dk || dateKey(r.date || "") });
+const SPEC_KEYS = ["color", "pol", "moist", "invert", "ma", "ash", "sed"];
+const fromDbSpec = s => ({ id: s.id, code: s.code, name: s.name, alt: s.alt, product: s.product, grade: gradeOfProduct(s.product || ""), t: s.t || {}, rules: Object.fromEntries(SPEC_KEYS.map(k => [k, parseRule((s.t || {})[k])])) });
 async function loadQuality(force) {
   if (Q.rows && Q.specs && !force) return Q;
   const cached = JSON.parse(localStorage.getItem("qc.quality") || "null");
   if (cached && cached.specs && !force && Date.now() - cached.at < sheetCfg().cacheMs) { Object.assign(Q, cached, { from: "cache" }); applyEdits(); return Q; }
   try {
-    const [qt, st] = await Promise.all([fetchSheet(sheetCfg().quality), fetchSheet(sheetCfg().spec)]);
-    Object.assign(Q, { rows: mapQuality(qt), specs: mapSpec(st), at: Date.now(), from: "live", error: null });
+    const j = await apiFetch(apiUrl() + "?action=getQuality&_=" + Date.now()).then(r => r.json());
+    if (!j.ok) throw new Error(j.error || "โหลดข้อมูลไม่ได้");
+    Object.assign(Q, { rows: j.rows.map(fromDbRow), specs: j.specs.map(fromDbSpec), at: Date.now(), from: "live", error: null });
     localStorage.setItem("qc.quality", JSON.stringify({ rows: Q.rows, specs: Q.specs, at: Q.at }));
   } catch (e) {
     if (cached && cached.specs) Object.assign(Q, cached, { from: "stale", error: e.message }); else Object.assign(Q, { rows: null, specs: null, error: e.message });
@@ -1569,7 +1569,7 @@ views["find-lot"] = {
       <div class="fl-block s-only"><h2>เกรด</h2>${chips("fGrade", [["", "ทั้งหมด"], ["DCR", "DCR"], ["VHP", "VHP"], ["Organic", "Organic"]])}</div>
       <div class="fl-block s-only"><h2>สถานะ Spec</h2>${chips("fStatus", [["", "ทั้งหมด"], ["ผ่าน", "ผ่าน"], ["เฝ้าระวัง", "เฝ้าระวัง"], ["ไม่ผ่าน", "ไม่ผ่าน"]])}</div>
       <div class="fl-actions"><button class="btn ghost sm" id="clear" type="button">ล้างตัวกรอง</button></div>
-      <div class="fl-status busy" id="dataStatus"><span class="dot"></span><span id="dataText">กำลังโหลดข้อมูลจาก Google Sheets…</span>
+      <div class="fl-status busy" id="dataStatus"><span class="dot"></span><span id="dataText">กำลังโหลดข้อมูล…</span>
         <button class="icon-btn" id="reload" aria-label="โหลดข้อมูลใหม่" title="โหลดข้อมูลใหม่" style="width:32px;height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
       </div>
     </div></section>
@@ -1638,7 +1638,7 @@ views["find-lot"] = {
     }
     function renderDetail(list) {
       const el = $("#detail");
-      if (!Q.rows) { el.innerHTML = Q.error ? empty("โหลดข้อมูลไม่ได้", Q.error, true) : empty("กำลังโหลดข้อมูลจาก Google Sheets…"); $("#retry")?.addEventListener("click", () => load(true)); return; }
+      if (!Q.rows) { el.innerHTML = Q.error ? empty("โหลดข้อมูลไม่ได้", Q.error, true) : empty("กำลังโหลดข้อมูล…"); $("#retry")?.addEventListener("click", () => load(true)); return; }
       const r = list.find(x => x.strike === selected);
       const banner = custBanner(list);
       if (mode === "cust" && !$("#fCust").value) { el.innerHTML = empty("เลือกลูกค้าเพื่อดู Lot ที่ผ่านเกณฑ์", "ระบบเทียบค่าคุณภาพทุก Lot กับสเปคของลูกค้าใน sheet Spec"); return; }
@@ -1692,10 +1692,10 @@ views["find-lot"] = {
       const el = $("#dataStatus"), t = $("#dataText");
       if (!Q.rows) { el.className = "fl-status err"; t.textContent = "โหลดข้อมูลไม่ได้: " + (Q.error || "ไม่ทราบสาเหตุ"); return; }
       el.className = "fl-status" + (Q.from === "stale" ? " err" : "");
-      t.textContent = (Q.from === "stale" ? "ออฟไลน์ ใช้ข้อมูลที่บันทึกไว้ · " : "Google Sheets · ") + `อัปเดต ${timeAgo(Q.at)} · ${fmtInt(Q.rows.length)} Lot · ${fmtInt((Q.specs || []).length)} สเปคลูกค้า`;
+      t.textContent = (Q.from === "stale" ? "ออฟไลน์ ใช้ข้อมูลที่บันทึกไว้ · " : "ฐานข้อมูล · ") + `อัปเดต ${timeAgo(Q.at)} · ${fmtInt(Q.rows.length)} Lot · ${fmtInt((Q.specs || []).length)} สเปคลูกค้า`;
     }
     async function load(force) {
-      $("#dataStatus").className = "fl-status busy"; $("#dataText").textContent = "กำลังโหลดข้อมูลจาก Google Sheets…";
+      $("#dataStatus").className = "fl-status busy"; $("#dataText").textContent = "กำลังโหลดข้อมูล…";
       await loadQuality(force); status(); fillCustomers(); fillMonths(root); if (!$("#tabDash").classList.contains("hide")) renderDashboard(root); if (!$("#tabEdit").classList.contains("hide")) renderEditor(root);
       if (Q.rows && params.get("lot") && Q.rows.some(r => r.strike === params.get("lot"))) selected = params.get("lot");
       render();
@@ -1813,12 +1813,12 @@ function dashboardHtml() {
 
 function renderDashboard(root) {
   const $ = s => root.querySelector(s);
-  if (!Q.rows) { $("#kpis").innerHTML = `<div class="d-empty" style="grid-column:1/-1"><img src="assets/mascot.png" alt=""><b>${Q.error ? "โหลดข้อมูลไม่ได้" : "กำลังโหลดข้อมูลจาก Google Sheets…"}</b></div>`; return; }
+  if (!Q.rows) { $("#kpis").innerHTML = `<div class="d-empty" style="grid-column:1/-1"><img src="assets/mascot.png" alt=""><b>${Q.error ? "โหลดข้อมูลไม่ได้" : "กำลังโหลดข้อมูล…"}</b></div>`; return; }
   const g = chipValue($("#dGrade")), m = $("#dMonth").value;
   const rows = Q.rows.filter(r => r.dk && (!g || r.grade === g) && (!m || r.dk.slice(0, 6) === m));
   const base = Q.rows.filter(r => r.dk && (!m || r.dk.slice(0, 6) === m));
   const seasonRows = Q.rows.filter(r => r.season); const season = seasonRows.length ? seasonRows[0].season.replace(" ", "/") : "";
-  $("#dashSub").textContent = `ฤดูผลิต ${season} · ${g || "ทุกเกรด"} · ${m ? TH_MON[+m.slice(4, 6) - 1] + " " + m.slice(0, 4) : "ทั้งฤดู"} · ข้อมูล ${fmtInt(Q.rows.length)} Lot จาก Google Sheets อัปเดต ${new Date(Q.at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}`;
+  $("#dashSub").textContent = `ฤดูผลิต ${season} · ${g || "ทุกเกรด"} · ${m ? TH_MON[+m.slice(4, 6) - 1] + " " + m.slice(0, 4) : "ทั้งฤดู"} · ข้อมูล ${fmtInt(Q.rows.length)} Lot จากฐานข้อมูล อัปเดต ${new Date(Q.at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}`;
 
   // KPIs
   const n = rows.length, pass = rows.filter(r => r.status === "ผ่าน").length, watch = rows.filter(r => r.status === "เฝ้าระวัง").length, fail = rows.filter(r => r.status === "ไม่ผ่าน").length;
@@ -1873,13 +1873,13 @@ function toSheetRow(r) {
 }
 async function postApi(payload) {
   const url = apiUrl();
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
+  const res = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) });
   if (!res.ok) throw new Error("HTTP " + res.status); const j = await res.json(); if (!j.ok) throw new Error(j.error || "บันทึกไม่สำเร็จ"); return j;
 }
 async function syncEdits(onDone) {
   const edits = getEdits(); const keys = Object.keys(edits); if (!keys.length) return { done: 0, failed: 0 };
   let done = 0, failed = 0, lastErr = "";
-  for (const k of keys) { try { await postApi({ action: "upsertLot", row: toSheetRow(edits[k].row) }); delete edits[k]; setEdits(edits); done++; } catch (e) { failed++; lastErr = e.message; } }
+  for (const k of keys) { try { await postApi({ action: "saveLot", row: edits[k].row }); delete edits[k]; setEdits(edits); done++; } catch (e) { failed++; lastErr = e.message; } }
   if (done) { await loadQuality(true); }
   if (onDone) onDone({ done, failed, lastErr });
   return { done, failed, lastErr };
@@ -1946,7 +1946,7 @@ function renderEditor(root) {
   const q = $("#eq").value.trim(), g = chipValue($("#eGrade"));
   const list = Q.rows.filter(r => (!q || r.strike.includes(q)) && (!g || r.grade === g)).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
   $("#edBody").innerHTML = list.slice(0, E.limit).map(r => `<tr class="${r.pending ? "pending" : ""}">
-    <td class="strike">${esc(r.strike)}${r.pending ? ' <span class="pill wait" title="ยังไม่ได้ซิงค์ขึ้นชีต">รอซิงค์</span>' : ""}</td><td>${esc(r.grade)}</td><td>${esc(r.date)}</td>
+    <td class="strike">${esc(r.strike)}${r.pending ? ' <span class="pill wait" title="ยังไม่ได้ส่งขึ้นฐานข้อมูล">รอซิงค์</span>' : ""}</td><td>${esc(r.grade)}</td><td>${esc(r.date)}</td>
     <td class="r">${fmtN(r.color, 0)}</td><td class="r">${fmtN(r.pol, 2)}</td><td class="r">${fmtN(r.moist, 2)}</td><td class="r">${fmtN(r.invert, 4)}</td><td class="r">${fmtN(r.ma, 2)}</td><td class="r">${fmtN(r.ash, 4)}</td><td class="r">${fmtN(r.sed, 0)}</td>
     <td><span class="pill ${QSTATUS[r.status] || "wait"}">${esc(r.status || "—")}</span></td><td class="muted">${esc(r.by || "—")}</td>
     <td><button type="button" class="btn sm ghost edit" data-s="${esc(r.strike)}">แก้ไข</button></td></tr>`).join("") || `<tr><td colspan="13" class="muted" style="padding:24px;text-align:center">ไม่พบ Lot</td></tr>`;
@@ -1984,8 +1984,8 @@ function initEditor(root) {
       color: num(g("color")), pol: num(g("pol")), moist: num(g("moist")), invert: num(g("invert")), ma: num(g("ma")), ash: num(g("ash")), sed: num(g("sed")),
       loc: g("loc"), stock: g("stock"), bags: g("bags"), customer: g("customer"), cert: g("cert"), by: getUser().name, edited: nowText() };
     const edits = getEdits(); edits[strike] = { row, at: Date.now(), op: editing ? "edit" : "add" }; setEdits(edits); applyEdits();
-    closeModal(); renderEditor(root); toast(`<b>บันทึกแล้ว</b> Lot ${esc(strike)} ${apiUrl() ? "กำลังส่งขึ้นชีต…" : "(เก็บในเครื่อง รอเชื่อมต่อ Apps Script)"}`);
-    if (apiUrl()) { const r = await syncEdits(); toast(r.failed ? `<b>ส่งขึ้นชีตไม่สำเร็จ</b> ${esc(r.lastErr)} เก็บไว้รอซิงค์` : `<b>บันทึกขึ้นชีตแล้ว</b> Lot ${esc(strike)}`, 3200); renderEditor(root); root.dispatchEvent(new CustomEvent("qc:data")); }
+    closeModal(); renderEditor(root); toast(`<b>บันทึกแล้ว</b> Lot ${esc(strike)} ${apiUrl() ? "กำลังบันทึกลงฐานข้อมูล…" : "(เก็บในเครื่อง รอเชื่อมต่อ Apps Script)"}`);
+    if (apiUrl()) { const r = await syncEdits(); toast(r.failed ? `<b>บันทึกลงฐานข้อมูลไม่สำเร็จ</b> ${esc(r.lastErr)} เก็บไว้รอซิงค์` : `<b>บันทึกขึ้นชีตแล้ว</b> Lot ${esc(strike)}`, 3200); renderEditor(root); root.dispatchEvent(new CustomEvent("qc:data")); }
   });
   $("#eq").addEventListener("input", () => { E.limit = 100; renderEditor(root); });
   $("#eGrade").addEventListener("change", () => { E.limit = 100; renderEditor(root); });
@@ -2059,8 +2059,11 @@ async function dpFlush() {
     // re-read the queue from storage each step so items appended during a POST (เช่น รูปที่ต่อท้ายหลัง saveDispatch) ไม่ถูกเขียนทับหาย
     while (true) {
       const q = dpQueue(); if (!q.length) break;
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) }).then(r => r.json());
-      if (!res.ok) throw new Error(res.error || "sync failed");
+      const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) }); const res = await http.json();
+      if (!res.ok) {
+        if (http.status !== 400 && http.status !== 403) throw new Error(res.error || "sync failed"); // เน็ต/เซิร์ฟเวอร์มีปัญหา หรือหมดเซสชัน → เก็บไว้ส่งใหม่
+        toast(`<b>เซิร์ฟเวอร์ไม่รับรายการนี้</b> ${esc(res.error || "")}`, 4000); // ถูกปฏิเสธ (ไม่มีสิทธิ์/ข้อมูลผิด) → ตัดออกจากคิว ไม่ให้ค้าง
+      }
       const q2 = dpQueue(); q2.shift(); localStorage.setItem(dpKey.queue, JSON.stringify(q2));
     }
   } catch (e) { /* keep queue, retry later */ } finally { dpFlushing = false; document.dispatchEvent(new CustomEvent("qc:dispatch")); }
@@ -2069,7 +2072,7 @@ window.addEventListener("online", dpFlush);
 async function dpRefresh() {
   const url = apiUrl(); if (!url || !navigator.onLine) return false;
   try {
-    const j = await fetch(url + "?action=getDispatch&_=" + Date.now()).then(r => r.json()); if (!j.ok) return false;
+    const j = await apiFetch(url + "?action=getDispatch&_=" + Date.now()).then(r => r.json()); if (!j.ok) return false;
     const pendingUids = new Set(dpQueue().filter(p => p.action === "saveDispatch").map(p => p.record.uid));
     const delUids = new Set(dpQueue().filter(p => p.action === "deleteDispatch").map(p => p.uid));
     const local = dpRecs(); const byUid = {}; local.forEach(r => byUid[r.uid] = r);
@@ -2255,7 +2258,7 @@ views.release = {
       $("#dpCards").innerHTML = html || `<div class="d-empty" style="padding:20px"><img src="assets/mascot.png" alt=""><b>ยังไม่มีบันทึก</b><span>${role === "recorder" ? "กด + บันทึกใหม่ เพื่อเริ่ม" : ""}</span></div>`;
       $("#dpResume")?.addEventListener("click", () => { draft = saved.draft; step = saved.step; editUid = saved.editUid; mode = "wizard"; showTab("entry"); renderEntry(); });
       $("#dpDraftDel")?.addEventListener("click", deleteSavedDraft);
-      const qn = dpQueue().length; $("#dpSync").innerHTML = !apiUrl() ? `<span class="dot off"></span>ยังไม่เชื่อมชีต (ตั้งค่า Web App URL)` : qn ? `<span class="dot wait"></span>รอซิงค์ขึ้นชีต ${qn} รายการ` : `<span class="dot ok"></span>ซิงค์กับ Google Sheets แล้ว`;
+      const qn = dpQueue().length; $("#dpSync").innerHTML = !apiUrl() ? `<span class="dot off"></span>ยังไม่เชื่อมฐานข้อมูล` : qn ? `<span class="dot wait"></span>รอส่งขึ้นฐานข้อมูล ${qn} รายการ` : `<span class="dot ok"></span>ซิงค์กับฐานข้อมูลแล้ว`;
     }
 
     /* ---- right column: empty / wizard / confirm / detail ---- */
@@ -2499,11 +2502,11 @@ const coaRole = () => { const r = getUser().role || ""; return r === "ผู้�
 async function coaFlush() {
   const url = apiUrl(); if (!url || !navigator.onLine) return;
   // re-read the queue each step so items added during a POST are not overwritten
-  while (true) { const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); if (!q.length) break; try { const r = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) }).then(x => x.json()); if (!r.ok) break; const q2 = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q2.shift(); localStorage.setItem(COA_KEY.queue, JSON.stringify(q2)); } catch (e) { break; } }
+  while (true) { const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); if (!q.length) break; try { const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) }); const r = await http.json(); if (!r.ok) { if (http.status !== 400 && http.status !== 403) break; toast(`<b>เซิร์ฟเวอร์ไม่รับใบ COA นี้</b> ${esc(r.error || "")}`, 4000); } const q2 = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q2.shift(); localStorage.setItem(COA_KEY.queue, JSON.stringify(q2)); } catch (e) { break; } }
 }
 async function coaRefresh() {
   const url = apiUrl(); if (!url || !navigator.onLine) return false;
-  try { const j = await fetch(url + "?action=getCoa&_=" + Date.now()).then(r => r.json()); if (!j.ok) return false;
+  try { const j = await apiFetch(url + "?action=getCoa&_=" + Date.now()).then(r => r.json()); if (!j.ok) return false;
     const cq = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); const pending = new Set(cq.filter(p => p.record).map(p => p.record.certNo)); const deleting = new Set(cq.filter(p => p.action === "deleteCoa").map(p => p.certNo)); const local = coaRecs();
     const merged = j.records.filter(r => !deleting.has(r.certNo)); const have = new Map(merged.map((r, i) => [r.certNo, i]));
     local.forEach(r => { if (pending.has(r.certNo)) { if (have.has(r.certNo)) merged[have.get(r.certNo)] = r; else merged.push(r); } });
@@ -2721,7 +2724,7 @@ views.coa = {
           <div class="facts one coa-reqfacts"><div><span>สเปคที่ใช้</span><b>${sp ? esc(sp.name + " · " + sp.product) : '<span class="bad">ไม่พบลูกค้านี้ในชีต Spec</span>'}</b></div></div>
           <div class="field mt"><label class="${p2 ? "req" : ""}">Lot / Strike ที่รับรอง (เฉพาะลอตที่จ่ายออกแล้ว)</label>${p2 ? `<div class="coa-lotadd"><select class="select" id="e_lotIn"><option value="">— เลือก Lot ที่จ่ายออกแล้ว —</option>${(Q.rows || []).filter(r => r.status !== "ไม่ผ่าน" && (!sp || r.grade === sp.grade) && dispSet.has(r.strike) && !cur.lots.some(l => l.strike === r.strike)).slice(0, 500).map(r => `<option value="${esc(r.strike)}">${esc(r.strike)} · ${esc(r.grade)} · สี ${fmtN(r.color, 0)} · ${esc(r.date)}</option>`).join("")}</select><button class="btn sm" id="e_lotAdd" type="button">เพิ่ม</button></div>` : ""}
             <div class="coa-lots">${cur.lots.map((l, i) => `<div class="coa-lot ${!l.found ? "" : l.gradeOk && !l.fails.length ? "ok" : "bad"}"><b>${esc(l.strike)}</b><span>${l.found ? `ผลิต ${esc(l.prodDate)} · สี ${esc(l.color)} · Pol ${esc(l.pol)}` : "ไม่พบใน Quality"}</span><input class="input" data-bb="${i}" value="${esc(l.bestBefore)}" placeholder="Best before" aria-label="Best before" ${dis2}><i>${!l.found ? "" : !l.gradeOk ? "เกรดไม่ตรงสเปค" : l.fails.length ? l.fails.join(" · ") : "ผ่านสเปค"}</i>${p2 ? `<button type="button" class="rm" data-rm="${i}" aria-label="ลบ">×</button>` : "<span></span>"}</div>`).join("") || `<p class="muted" style="font-size:13px">ยังไม่มี Lot · ระบบเสนอ Lot จากใบส่งมอบของรถทะเบียนเดียวกัน · เพิ่มได้เฉพาะลอตที่จ่ายออกแล้ว</p>`}</div></div>
-          <div class="section-title" style="margin-top:16px"><h2>ค่าคุณภาพ / Specification / Method</h2><span class="hint">ค่าดึงจากชีต Quality · อ่านอย่างเดียว</span></div>
+          <div class="section-title" style="margin-top:16px"><h2>ค่าคุณภาพ / Specification / Method</h2><span class="hint">ค่าดึงจากฐานข้อมูลคุณภาพ · อ่านอย่างเดียว</span></div>
           <div class="tbl-wrap"><table class="spec coa-sm"><thead><tr><th>รายการ</th><th>ค่าที่วัดได้</th><th>Specification</th><th>Method</th></tr></thead><tbody>${COA_COLS.map(c => { const vals = cur.lots.map(l => ({ v: l[c[0]], bad: l.fails && l.fails.some(f => f.startsWith(PARAM[c[0]])) })); const valCell = vals.length ? vals.map(x => `<span class="${x.bad ? "bad" : ""}">${esc(x.v || "—")}</span>`).join(" / ") : "—"; return `<tr><td class="name"><b>${c[1]}</b><small>${c[2]}</small></td><td class="mval">${valCell}</td><td class="rd">${esc(cur.spec[c[0]] || "—")}</td><td class="rd">${esc(cur.method[c[0]] || "—")}</td></tr>`; }).join("")}</tbody></table></div>
           <div class="grid-2 mt"><div class="field"><label>Reporter</label><input class="input" value="${esc(cur.reporter || me.name)}" readonly></div><div class="field"><label class="${p2 ? "req" : ""}" for="e_appr">Approved by</label>${p2 ? `<select class="select" id="e_appr"><option value="">— เลือกผู้อนุมัติ —</option>${APPROVERS.map(n => `<option ${n === cur.approvedBy ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>` : `<input class="input" value="${esc(cur.approvedBy || "—")}" readonly>`}</div></div>
           ${st === "request" && p2
@@ -2798,7 +2801,7 @@ views.coa = {
     // แอดมินลบใบ COA ที่ยังไม่อนุมัติ (ร่าง) ออกทั้งในเครื่องและในชีต
     $("#c_delDraft").addEventListener("click", () => {
       if (!cur || role !== "admin" || !isDraftCoa(cur)) return; const no = cur.certNo;
-      if (!confirm(`ลบร่าง COA ${no} ถาวร? (ลบออกจากชีตด้วย กู้คืนไม่ได้)`)) return;
+      if (!confirm(`ลบร่าง COA ${no} ถาวร? (ลบออกจากฐานข้อมูลด้วย กู้คืนไม่ได้)`)) return;
       if (cur.status !== "new") {
         coaSave(coaRecs().filter(r => r.certNo !== no));
         const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]").filter(p => !(p.record && p.record.certNo === no));
@@ -2835,6 +2838,7 @@ views.coa = {
     renderPaper(); renderList();
     const boot = () => { if (cur) { if (cur.status !== "new") { const r = coaRecs().find(x => x.certNo === cur.certNo); if (r) open(r); else { renderEditor(); renderPaper(); } } else { renderEditor(); renderPaper(); } } else { const want = params.get("no") && coaRecs().find(x => x.certNo === params.get("no")); const l = want || coaRecs().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0]; if (l) open(l); else { cur = null; renderEditor(); renderPaper(); } } renderList(); }; // ไม่สร้างใบเปล่าอัตโนมัติ — กด + เพิ่ม COA เอง
     loadQuality(false).then(boot); coaRefresh().then(() => { boot(); if (tab === "dash") renderDash(); }); coaFlush();
+    dpRefresh().then(ok => { if (ok && cur) renderEditor(); }); // รายการรถ/Lot ที่จ่ายออก (ฝ่ายขายเปิดหน้าจ่ายออกไม่ได้ จึงโหลดที่นี่)
     if (params.get("tab") === "dash") showTab("dash");
   },
 };
@@ -2874,7 +2878,7 @@ const repackCode = prodDate => {
   return "R" + dd + mm + s;
 };
 views.repack = {
-  bar: true, title: "Repack", sub: "บันทึกการแพ็คซ้ำตาม Lot · ลงชีต Quality", icon: "btn-repack-01.png", accent: "grape",
+  bar: true, title: "Repack", sub: "บันทึกการแพ็คซ้ำตาม Lot · ลงฐานข้อมูล", icon: "btn-repack-01.png", accent: "grape",
   html: () => `
     <div class="page repack-page">
       <div class="rp-grid">
@@ -2908,7 +2912,7 @@ views.repack = {
     const fetchRecords = async strike => {
       const url = apiUrl(); if (!url || !strike) { renderRecords([]); return; }
       renderRecords(null, true);
-      try { const j = await fetch(url + "?action=getRepack&strike=" + encodeURIComponent(strike) + "&_=" + Date.now()).then(r => r.json()); renderRecords(j.ok ? j.records : []); }
+      try { const j = await apiFetch(url + "?action=getRepack&strike=" + encodeURIComponent(strike) + "&_=" + Date.now()).then(r => r.json()); renderRecords(j.ok ? j.records : []); }
       catch (e) { recsEl.innerHTML = `<div class="rp-empty"><b style="color:var(--bad)">โหลดบันทึกไม่ได้</b></div>`; }
     };
     const showInfo = () => {
@@ -2927,7 +2931,7 @@ views.repack = {
       const url = apiUrl(); if (!url) { toast("ยังไม่ได้ตั้งค่า Web App URL"); return; }
       okBtn.disabled = true; setSync("กำลังบันทึก…");
       try {
-        const j = await fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveRepack", strike: l.strike, rcode: code }) }).then(r => r.json());
+        const j = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "saveRepack", strike: l.strike, rcode: code }) }).then(r => r.json());
         if (j.ok) { toast(`<b>บันทึกแล้ว</b> Lot ${esc(l.strike)} · ${esc(code)}`); fetchRecords(l.strike); }
         else if (j.duplicate) { toast(`<b>ซ้ำ</b> วันนี้บันทึก Lot ${esc(l.strike)} ไปแล้ว`); }
         else { toast(`<b>บันทึกไม่ได้</b> ${esc(j.error || "")}`); }
@@ -2938,7 +2942,7 @@ views.repack = {
     loadQuality(false).then(() => {
       const rows = [...(Q.rows || [])].filter(r => !/organic/i.test(r.grade || "")).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
       $("#rpLotList").innerHTML = rows.map(r => `<option value="${esc(r.strike)}"></option>`).join("");
-      setSync(rows.length ? "" : "ไม่พบ Lot ในชีต Quality");
+      setSync(rows.length ? "" : "ไม่พบ Lot ในฐานข้อมูล");
     });
   },
 };
@@ -2947,36 +2951,38 @@ views.settings = {
   html: () => `
   <main class="page"><div class="set-wrap">
     <nav class="set-nav" aria-label="หมวดการตั้งค่า">
-      <a href="#/settings" data-go="s-user" class="on">${SICON.user}ผู้ใช้งาน</a>
-      <a href="#/settings" data-go="s-sheet">${SICON.sheet}แหล่งข้อมูล</a>
-      <a href="#/settings" data-go="s-write">${SICON.upload}บันทึกกลับชีต</a>
+      <a href="#/settings" data-go="s-user" class="on">${SICON.user}บัญชีของฉัน</a>
+      <a href="#/settings" data-go="s-users">${SICON.key}ผู้ใช้และสิทธิ์</a>
+      <a href="#/settings" data-go="s-spec">${SICON.grade}สเปคลูกค้า</a>
+      <a href="#/settings" data-go="s-data">${SICON.sheet}ฐานข้อมูล</a>
       <a href="#/settings" data-go="s-def">${SICON.sliders}ค่าเริ่มต้น</a>
       <a href="#/settings" data-go="s-sys">${SICON.system}ระบบ</a>
     </nav>
     <div class="set-main">
       <section class="scard" id="s-user">
         <div class="shead"><div class="av" id="pAvatar"></div><div class="stitle"><h2 id="pName"></h2><small id="pRole"></small></div><span class="pill ok" style="margin-left:auto">เข้าสู่ระบบแล้ว</span></div>
-        ${srow("user", "ชื่อที่แสดงในแอป", "ใช้ลงคอลัมน์ \"ผู้บันทึกล่าสุด\" เมื่อเพิ่มหรือแก้ไข Lot", `<input class="input" id="name">`)}
-        ${srow("grade", "บทบาท", "", `<select class="select" id="role"><option>QC</option><option>หัวหน้า QC</option><option>คลังสินค้า</option><option>ผู้ดูแลระบบ</option></select>`)}
-        ${srow("key", "รหัสผ่าน", "ระบบล็อกอินจริงจะมาพร้อมการเชื่อมต่อชีต Users", `<button class="btn sm ghost" id="pw" type="button">เปลี่ยนรหัสผ่าน</button>`)}
+        ${srow("user", "ชื่อผู้ใช้", "ใช้ตอนเข้าสู่ระบบ", `<span class="sval" id="pUser">—</span>`)}
+        ${srow("grade", "บทบาท", "แอดมินเป็นผู้กำหนดบทบาทและสิทธิ์", `<span class="sval" id="pRoleV">—</span>`)}
+        ${srow("key", "รหัสผ่าน", "เปลี่ยนรหัสผ่านของบัญชีนี้", `<button class="btn sm ghost" id="pw" type="button">เปลี่ยนรหัสผ่าน</button>`)}
       </section>
 
-      <section class="scard" id="s-sheet">
-        <div class="shead"><span class="sico big">${SICON.sheet}</span><div class="stitle"><h2>แหล่งข้อมูล Google Sheets</h2><small>อ่านผ่านลิงก์แชร์ สเปรดชีตต้องเปิดเป็น "ทุกคนที่มีลิงก์ดูได้"</small></div></div>
-        ${srow("link", "สเปรดชีต", "วางลิงก์หรือ ID ว่างไว้ = ใช้สเปรดชีต QC Time", `<input class="input" id="sheetId" placeholder="https://docs.google.com/spreadsheets/d/…">`, "wide")}
-        ${srow("sheet", "ชีตข้อมูลคุณภาพ", "", `<input class="input" id="qualitySheet" placeholder="Quality">`)}
-        ${srow("sheet", "ชีตสเปคลูกค้า", "", `<input class="input" id="specSheet" placeholder="Spec">`)}
-        ${srow("clock", "เก็บข้อมูลไว้ในเครื่อง", "นาทีก่อนโหลดจากชีตใหม่", `<div class="unit"><input class="input" id="cacheMin" type="number" min="0" placeholder="10"><span>นาที</span></div>`)}
-        <div class="sfoot"><div class="conn" id="readStat"><span class="dot"></span><span id="readText">ยังไม่ได้ทดสอบ</span></div><div class="sbtns"><button class="btn sm ghost" id="clearCache" type="button">ล้างข้อมูลที่เก็บไว้</button><button class="btn sm" id="testRead" type="button">ทดสอบอ่านข้อมูล</button></div></div>
+      <section class="scard" id="s-users">
+        <div class="shead"><span class="sico big">${SICON.key}</span><div class="stitle"><h2>ผู้ใช้และสิทธิ์</h2><small>เพิ่ม/แก้ไขผู้ใช้ กำหนดบทบาท ปิดการใช้งาน และรีเซ็ตรหัสผ่าน</small></div><button class="btn sm" id="uAdd" type="button" style="margin-left:auto">+ เพิ่มผู้ใช้</button></div>
+        <div class="s-tbl tbl-wrap" id="uList"><p class="muted" style="padding:12px 22px">กำลังโหลด…</p></div>
       </section>
 
-      <section class="scard" id="s-write">
-        <div class="shead"><span class="sico big">${SICON.upload}</span><div class="stitle"><h2>บันทึกกลับชีต</h2><small>Apps Script Web App สำหรับแท็บ "แก้ไขและเพิ่มคุณภาพ"</small></div><span class="pill" id="apiPill" style="margin-left:auto"></span></div>
-        ${srow("link", "Web App URL", "ลงท้ายด้วย /exec", `<input class="input" id="api" placeholder="https://script.google.com/macros/s/…/exec">`, "wide")}
-        ${srow("sync", "รายการรอซิงค์", "การแก้ไขที่ยังไม่ได้ส่งขึ้นชีต", `<div class="row"><b id="pendingN" class="num"></b><button class="btn sm ghost" id="syncBtn" type="button">ซิงค์ตอนนี้</button></div>`)}
-        ${srow("user", "ผู้ใช้งานในชีต Users", "สร้างชีต Users และใส่ผู้ใช้เริ่มต้น " + USERS.length + " คน (มีอยู่แล้วจะอัปเดตชื่อ/บทบาท)", `<button class="btn sm ghost" id="seedUsers" type="button">สร้างผู้ใช้ในชีต</button>`)}
-        <details class="shelp"><summary>วิธีติดตั้งสคริปต์ (ทำครั้งเดียว)</summary><ol><li>เปิดสเปรดชีต → Extensions → Apps Script</li><li>วางโค้ดจากไฟล์ <code>apps-script/QCTime.gs</code> แล้ว Save</li><li>Deploy → New deployment → Web app · Execute as Me · Who has access: Anyone</li><li>คัดลอก Web app URL มาวางด้านบน แล้วกดทดสอบ</li></ol></details>
-        <div class="sfoot"><div class="conn" id="apiStat"><span class="dot"></span><span id="apiText">ยังไม่ได้เชื่อมต่อ การแก้ไขจะเก็บในเครื่องจนกว่าจะเชื่อมต่อ</span></div><div class="sbtns"><button class="btn sm" id="testApi" type="button">ทดสอบการเชื่อมต่อ</button></div></div>
+      <section class="scard" id="s-spec">
+        <div class="shead"><span class="sico big">${SICON.grade}</span><div class="stitle"><h2>สเปคลูกค้า</h2><small>ใช้เทียบ Lot ในหน้าค้นหาและใบ COA</small></div><button class="btn sm" id="spAdd" type="button" style="margin-left:auto">+ เพิ่มสเปค</button></div>
+        <div class="s-tbl tbl-wrap" id="spList"><p class="muted" style="padding:12px 22px">กำลังโหลด…</p></div>
+      </section>
+
+      <section class="scard" id="s-data">
+        <div class="shead"><span class="sico big">${SICON.sheet}</span><div class="stitle"><h2>ฐานข้อมูล</h2><small>Cloudflare D1 · ข้อมูลทั้งหมดของแอปเก็บที่นี่</small></div><span class="pill info" id="dbPill" style="margin-left:auto">กำลังตรวจ…</span></div>
+        ${srow("info", "ข้อมูลในฐานข้อมูล", "", `<span class="sval" id="dbCounts">—</span>`)}
+        ${srow("upload", "นำเข้าจาก Google Sheets", "คัดลอก Quality, Spec, Users, บันทึกจ่ายออก, ใบ COA และ Repack จากระบบเดิม (ข้อมูลในชีตไม่ถูกลบ)", `<button class="btn sm ghost" id="impBtn" type="button">นำเข้าข้อมูล</button>`)}
+        <pre class="slog hide" id="impLog"></pre>
+        ${srow("sync", "การแก้ไข Lot ที่รอส่ง", "แก้ไขตอนออฟไลน์ จะส่งขึ้นฐานข้อมูลเมื่อออนไลน์", `<div class="row"><b id="pendingN" class="num"></b><button class="btn sm ghost" id="syncBtn" type="button">ส่งตอนนี้</button></div>`)}
+        ${srow("broom", "ล้างข้อมูลทดสอบ", "ลบบันทึกจ่ายออก / ใบ COA ทั้งหมดออกจากฐานข้อมูลและในเครื่อง", `<div class="srow-btns"><button class="btn sm ghost danger" id="clearDpBtn" type="button">ล้างบันทึกจ่ายออก</button><button class="btn sm ghost danger" id="clearCoaBtn" type="button">ล้างใบ COA</button></div>`)}
       </section>
 
       <section class="scard" id="s-def">
@@ -2984,111 +2990,205 @@ views.settings = {
         ${srow("flag", "ฤดูผลิตปัจจุบัน", "ใส่ให้ Lot ใหม่อัตโนมัติ", `<input class="input" id="season" placeholder="25 26">`)}
         ${srow("grade", "เกรดเริ่มต้นในหน้าค้นหา", "", `<select class="select" id="defaultGrade"><option value="">ทั้งหมด</option><option>DCR</option><option>VHP</option><option>Organic</option></select>`)}
         ${srow("title", "ชื่อหัวรายงานแดชบอร์ด", "", `<input class="input" id="reportTitle" placeholder="รายงานคุณภาพน้ำตาล">`)}
+        ${srow("clock", "เก็บข้อมูล Lot ไว้ในเครื่อง", "นาทีก่อนโหลดจากฐานข้อมูลใหม่", `<div class="unit"><input class="input" id="cacheMin" type="number" min="0" placeholder="10"><span>นาที</span></div>`)}
         ${srow("eye", "แสดงลูกค้าที่ไม่ผ่านสเปคทันที", "ในการ์ด Lot โดยไม่ต้องกดดู", `<button class="switch" aria-checked="false" data-key="showFails"></button>`)}
         ${srow("motion", "มาสคอตขยับในหน้าแรก", "ปิดเพื่อประหยัดแบตบนมือถือ", `<button class="switch" aria-checked="true" data-key="motion"></button>`)}
       </section>
 
       <section class="scard" id="s-sys">
-        <div class="shead"><span class="sico big">${SICON.system}</span><div class="stitle"><h2>ระบบ</h2><small>QC Time 0.4 · เครื่องนี้ <span id="devId"></span></small></div></div>
-        ${srow("info", "ข้อมูลที่โหลดไว้", "", `<span class="sval" id="pData">—</span>`)}
-        ${srow("broom", "ล้างข้อมูลทดสอบในชีต", "ลบบันทึกจ่ายออก / ใบ COA ทั้งหมดออกจาก Google Sheet และในเครื่อง (ใช้ตอนเริ่มทดสอบใหม่)", `<span class="srow-btns"><button class="btn sm ghost danger" id="clearDpBtn" type="button">ล้างจ่ายออก</button><button class="btn sm ghost danger" id="clearCoaBtn" type="button">ล้างใบ COA</button></span>`)}
-        ${srow("broom", "คืนค่าการตั้งค่าเริ่มต้น", "ไม่ลบข้อมูล Lot ที่รอซิงค์", `<button class="btn sm ghost" id="resetBtn" type="button">คืนค่าเริ่มต้น</button>`)}
-        ${srow("broom", "ล้างข้อมูลในเครื่องทั้งหมด", "การตั้งค่า ข้อมูลที่เก็บไว้ และรายการรอซิงค์", `<button class="btn sm ghost danger" id="wipeBtn" type="button">ล้างทั้งหมด</button>`)}
+        <div class="shead"><span class="sico big">${SICON.system}</span><div class="stitle"><h2>ระบบ</h2><small>QC Time 0.5 · เครื่องนี้ <span id="devId"></span></small></div></div>
+        ${srow("info", "ข้อมูลที่โหลดไว้ในเครื่อง", "", `<span class="sval" id="pData">—</span>`)}
+        ${srow("broom", "ล้างข้อมูล Lot ที่เก็บในเครื่อง", "จะโหลดใหม่จากฐานข้อมูลเมื่อเปิดหน้าค้นหา", `<button class="btn sm ghost" id="clearCache" type="button">ล้าง</button>`)}
+        ${srow("broom", "คืนค่าการตั้งค่าเริ่มต้น", "ไม่ลบข้อมูล", `<button class="btn sm ghost" id="resetBtn" type="button">คืนค่าเริ่มต้น</button>`)}
         ${srow("logout", "ออกจากระบบ", "", `<button class="btn sm ghost danger" id="logout" type="button">ออกจากระบบ</button>`)}
       </section>
     </div>
-  </div></main>`,
+  </div>
+  <div class="modal hide" id="sModal"><div class="modal-box sm"><div class="modal-head"><h2 id="sModalTitle"></h2></div><div id="sModalBody"></div><div class="modal-foot"><span class="muted" id="sModalErr" style="color:var(--bad)"></span><button type="button" class="btn ghost" id="sModalNo">ยกเลิก</button><button type="button" class="btn" id="sModalYes">บันทึก</button></div></div></div>
+  </main>`,
   init(root) {
     const $ = s => root.querySelector(s);
     initSwitches(root);
+    const ROLES = ["คลังสินค้า", "QC", "QA", "ผู้อนุมัติ", "ฝ่ายขาย", "แพ็ค", "ผู้ดูแลระบบ"];
+    const isAdmin = getUser().role === "ผู้ดูแลระบบ";
     let devId = localStorage.getItem("qc.device");
     if (!devId) { devId = "QCT-" + Math.random().toString(36).slice(2, 6).toUpperCase(); localStorage.setItem("qc.device", devId); }
     $("#devId").textContent = devId;
-    const s = getSettings(), user = getUser();
-    $("#name").value = user.name; $("#role").value = user.role;
-    ["sheetId", "qualitySheet", "specSheet", "cacheMin", "api", "season", "defaultGrade", "reportTitle"].forEach(k => { if (s[k] !== undefined && s[k] !== null) $("#" + k).value = s[k]; });
+    const s = getSettings(), user = getUser(), sess = getSession() || {};
+    $("#pName").textContent = user.name; $("#pAvatar").textContent = (user.name || "Q").slice(0, 1); $("#pRole").textContent = `${user.role} · Mitr Lao Sugar`;
+    $("#pUser").textContent = sess.user || localStorage.getItem("qc.lastUser") || "—"; $("#pRoleV").textContent = user.role;
+    ["cacheMin", "season", "defaultGrade", "reportTitle"].forEach(k => { if (s[k] !== undefined && s[k] !== null) $("#" + k).value = s[k]; });
     root.querySelectorAll(".switch[data-key]").forEach(sw => { if (s[sw.dataset.key] !== undefined) sw.setAttribute("aria-checked", s[sw.dataset.key]); });
-    if (!$("#api").value.trim()) $("#api").value = API_DEFAULT;
-    const apiOk = () => /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test($("#api").value.trim());
     const cached = () => JSON.parse(localStorage.getItem("qc.quality") || "null");
 
     function refresh() {
-      const n = $("#name").value.trim() || "—"; $("#pName").textContent = n; $("#pAvatar").textContent = n.slice(0, 1); $("#pRole").textContent = `${$("#role").value} · Mitr Lao Sugar`;
       const c = cached(); $("#pData").textContent = c ? `${fmtInt(c.rows.length)} Lot · ${fmtInt((c.specs || []).length)} สเปค · อัปเดต ${new Date(c.at).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}` : "ยังไม่ได้โหลด";
       const pn = pendingCount(); $("#pendingN").textContent = fmtInt(pn); $("#syncBtn").disabled = !pn;
-      const ok = apiOk(); const pill = $("#apiPill"); pill.className = "pill " + (ok ? "ok" : "info"); pill.textContent = ok ? "ตั้งค่าแล้ว" : "อ่านอย่างเดียว";
     }
     function collect() {
       const o = { ...getSettings() };
-      ["sheetId", "qualitySheet", "specSheet", "api", "season", "defaultGrade", "reportTitle"].forEach(k => o[k] = $("#" + k).value.trim());
+      ["season", "defaultGrade", "reportTitle"].forEach(k => o[k] = $("#" + k).value.trim());
       o.cacheMin = Number($("#cacheMin").value) > 0 ? Number($("#cacheMin").value) : 10;
       root.querySelectorAll(".switch[data-key]").forEach(x => o[x.dataset.key] = swOn(x));
-      o.savedAt = new Date().toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" });
       return o;
     }
     let timer, lastToast = 0;
-    function save(quiet) {
-      const before = getSettings(); const o = collect();
-      localStorage.setItem("qc.settings", JSON.stringify(o));
-      localStorage.setItem("qc.user", JSON.stringify({ name: $("#name").value.trim() || "QC", role: $("#role").value }));
-      if (before.sheetId !== o.sheetId || before.qualitySheet !== o.qualitySheet || before.specSheet !== o.specSheet) { localStorage.removeItem("qc.quality"); Q.rows = null; Q.specs = null; }
-      const chip = app.querySelector(".user-chip"); if (chip) { chip.querySelector(".avatar").textContent = (o.name || $("#name").value.trim() || "Q").slice(0, 1); chip.querySelector("span:last-child").textContent = $("#name").value.trim() || "QC"; }
-      refresh(); if (!quiet && Date.now() - lastToast > 1500) { toast("บันทึกแล้ว", 1200); lastToast = Date.now(); }
-    }
+    function save(quiet) { localStorage.setItem("qc.settings", JSON.stringify(collect())); refresh(); if (!quiet && Date.now() - lastToast > 1500) { toast("บันทึกแล้ว", 1200); lastToast = Date.now(); } }
     const autosave = () => { clearTimeout(timer); timer = setTimeout(() => save(false), 500); };
-    root.querySelectorAll("input, select").forEach(el => { el.addEventListener("input", autosave); el.addEventListener("change", autosave); });
+    root.querySelectorAll("#s-def input, #s-def select").forEach(el => { el.addEventListener("input", autosave); el.addEventListener("change", autosave); });
     root.addEventListener("change", e => { if (e.target.classList.contains("switch")) autosave(); });
 
     root.querySelectorAll(".set-nav a").forEach(a => a.addEventListener("click", e => { e.preventDefault(); root.querySelectorAll(".set-nav a").forEach(x => x.classList.toggle("on", x === a)); $("#" + a.dataset.go).scrollIntoView({ behavior: "smooth", block: "start" }); }));
     const cards = [...root.querySelectorAll(".scard")];
     window.addEventListener("scroll", () => { let cur = cards[0]; cards.forEach(c => { if (c.getBoundingClientRect().top <= 120) cur = c; }); root.querySelectorAll(".set-nav a").forEach(x => x.classList.toggle("on", x.dataset.go === cur.id)); }, { passive: true });
 
-    $("#testRead").addEventListener("click", async () => {
-      save(true); $("#readStat").className = "conn"; $("#readText").textContent = "กำลังอ่านข้อมูล…";
-      try { const t = await fetchSheet(sheetCfg().quality); const t2 = await fetchSheet(sheetCfg().spec); $("#readStat").className = "conn ok"; $("#readText").textContent = `อ่านได้ ${fmtInt(t.rows.length)} แถวใน ${sheetCfg().quality} และ ${fmtInt(t2.rows.length)} แถวใน ${sheetCfg().spec}`; }
-      catch (e) { $("#readStat").className = "conn err"; $("#readText").textContent = "อ่านไม่ได้: " + e.message + " (ตรวจการแชร์ลิงก์และชื่อชีต)"; }
-    });
-    $("#clearCache").addEventListener("click", () => { localStorage.removeItem("qc.quality"); Q.rows = null; Q.specs = null; toast("<b>ล้างข้อมูลที่เก็บไว้แล้ว</b> จะโหลดใหม่เมื่อเปิดหน้าค้นหา"); refresh(); });
-    $("#testApi").addEventListener("click", async () => {
-      save(true); const url = $("#api").value.trim();
-      if (!apiOk()) { $("#apiStat").className = "conn err"; $("#apiText").textContent = "URL ต้องขึ้นต้นด้วย https://script.google.com/macros/s/ และลงท้ายด้วย /exec"; return; }
-      $("#apiStat").className = "conn"; $("#apiText").textContent = "กำลังทดสอบ…";
-      try { const j = await fetch(url).then(r => r.json()); if (j.ok && j.service === "qc-time") { $("#apiStat").className = "conn ok"; $("#apiText").textContent = `เชื่อมต่อสำเร็จ · สคริปต์ QC Time · ชีต ${j.sheet}`; } else throw new Error("ไม่ใช่สคริปต์ QC Time"); }
-      catch (e) { $("#apiStat").className = "conn err"; $("#apiText").textContent = "เชื่อมต่อไม่ได้: " + e.message + " (ตรวจว่า Deploy เป็น Web app แบบ Anyone แล้ว)"; }
-    });
-    $("#syncBtn").addEventListener("click", async () => { save(true); toast("กำลังซิงค์…"); const r = await syncEdits(); toast(r.failed ? `<b>ซิงค์ได้ ${r.done} ล้มเหลว ${r.failed}</b> ${esc(r.lastErr)}` : `<b>ซิงค์แล้ว ${r.done} รายการ</b>`, 3200); refresh(); });
-    $("#pw").addEventListener("click", () => toast("<b>เปลี่ยนรหัสผ่าน</b> แก้ในชีต Users คอลัมน์ Password ได้เลย"));
-    $("#seedUsers").addEventListener("click", async () => {
-      save(true); if (!confirm(`สร้าง/อัปเดตผู้ใช้ ${USERS.length} คนในชีต Users ของสเปรดชีตนี้?`)) return; toast("กำลังส่งรายชื่อผู้ใช้…");
-      try { const j = await postApi({ action: "seedUsers", users: USERS.map(u => ({ user: u.user, pass: u.pass, name: u.name, role: u.role })) }); toast(`<b>สร้างผู้ใช้ในชีตแล้ว</b> เพิ่ม ${j.added} คน อัปเดต ${j.updated} คน`, 3500); }
-      catch (e) { toast(`<b>ทำไม่ได้</b> ${esc(e.message)} (ต้องอัปเดตโค้ดสคริปต์เป็นเวอร์ชันล่าสุดแล้ว Deploy → New version ก่อน)`, 5000); }
-    });
-    const clearSheetData = async (label, action, keys) => {
-      if (!confirm(`ล้าง${label}ทั้งหมดออกจาก Google Sheet และในเครื่อง?\nการลบนี้ย้อนกลับไม่ได้`)) return;
-      keys.forEach(k => localStorage.removeItem(k));
-      if (!apiUrl()) { toast(`<b>ล้าง${label}ในเครื่องแล้ว</b> (ยังไม่เชื่อมชีต)`); return; }
-      toast("กำลังล้าง…");
-      try { const j = await postApi({ action }); toast(`<b>ล้าง${label}แล้ว</b> ลบจากชีต ${j.cleared || 0} รายการ`, 3200); }
-      catch (e) { toast(`<b>ล้างในเครื่องแล้ว</b> แต่ลบจากชีตไม่ได้: ${esc(e.message || "")}`, 3600); }
-    };
-    $("#clearDpBtn").addEventListener("click", () => clearSheetData("บันทึกจ่ายออก", "clearDispatch", ["qc.dispatch", "qc.dispatch.queue", "qc.dispatch.draft"]));
-    $("#clearCoaBtn").addEventListener("click", () => clearSheetData("ใบ COA", "clearCoa", ["qc.coa", "qc.coa.queue"]));
-    $("#resetBtn").addEventListener("click", () => { localStorage.removeItem("qc.settings"); route(); toast("<b>คืนค่าเริ่มต้นแล้ว</b>"); });
-    $("#wipeBtn").addEventListener("click", () => {
-      const n = pendingCount(); if (!confirm(`ล้างการตั้งค่า ข้อมูลที่เก็บไว้ และรายการรอซิงค์ ${n} รายการ ในเครื่องนี้ทั้งหมด?`)) return;
-      ["qc.settings", "qc.quality", "qc.edits", "qc.user", "qc.lastUser", "qc.device"].forEach(k => localStorage.removeItem(k)); Q.rows = null; Q.specs = null; route(); toast("<b>ล้างข้อมูลในเครื่องแล้ว</b>");
-    });
-    $("#logout").addEventListener("click", () => { clearSession(); toast("<b>ออกจากระบบแล้ว</b>"); location.hash = "#/login"; });
-    refresh();
-    // non-admin: only allow changing the password — hide everything else
-    if (getUser().role !== "ผู้ดูแลระบบ") {
-      root.querySelector(".set-wrap")?.classList.add("solo");
-      root.querySelector(".set-nav")?.remove();
-      ["s-sheet", "s-write", "s-def", "s-sys"].forEach(id => root.querySelector("#" + id)?.remove());
-      root.querySelectorAll("#s-user .srow").forEach(r => { if (!r.querySelector("#pw")) r.remove(); });
+    /* ---- small form modal ---- */
+    function form(title, bodyHtml, onSave, okLabel = "บันทึก") {
+      const m = $("#sModal"); $("#sModalTitle").textContent = title; $("#sModalBody").innerHTML = bodyHtml; $("#sModalErr").textContent = ""; $("#sModalYes").textContent = okLabel; m.classList.remove("hide");
+      initSwitches($("#sModalBody")); $("#sModalBody").querySelector("input, select")?.focus();
+      const close = () => m.classList.add("hide");
+      $("#sModalNo").onclick = close;
+      $("#sModalYes").onclick = async () => { const b = $("#sModalYes"); b.disabled = true; try { const err = await onSave($("#sModalBody")); if (err) $("#sModalErr").textContent = err; else close(); } catch (e) { $("#sModalErr").textContent = e.message; } finally { b.disabled = false; } };
     }
+    const fld = (id, label, ctl) => `<div class="field"><label for="${id}">${label}</label>${ctl}</div>`;
+
+    /* ---- my password ---- */
+    $("#pw").addEventListener("click", () => form("เปลี่ยนรหัสผ่าน",
+      fld("f_old", "รหัสผ่านเดิม", `<input class="input" id="f_old" type="password" autocomplete="current-password">`) + fld("f_new", "รหัสผ่านใหม่", `<input class="input" id="f_new" type="password" autocomplete="new-password">`) + fld("f_new2", "ยืนยันรหัสผ่านใหม่", `<input class="input" id="f_new2" type="password" autocomplete="new-password">`),
+      async b => {
+        const o = b.querySelector("#f_old").value, n = b.querySelector("#f_new").value;
+        if (n.length < 4) return "รหัสผ่านใหม่ต้องยาวอย่างน้อย 4 ตัวอักษร"; if (n !== b.querySelector("#f_new2").value) return "รหัสผ่านใหม่ไม่ตรงกัน";
+        await postApi({ action: "changePassword", oldPass: o, newPass: n }); toast("<b>เปลี่ยนรหัสผ่านแล้ว</b>");
+      }));
+
+    $("#logout").addEventListener("click", logout);
+    $("#clearCache").addEventListener("click", () => { localStorage.removeItem("qc.quality"); Q.rows = null; Q.specs = null; refresh(); toast("<b>ล้างข้อมูลที่เก็บไว้แล้ว</b> จะโหลดใหม่เมื่อเปิดหน้าค้นหา"); });
+    $("#resetBtn").addEventListener("click", () => { localStorage.removeItem("qc.settings"); route(); toast("<b>คืนค่าเริ่มต้นแล้ว</b>"); });
+    refresh();
+
+    if (!isAdmin) { // non-admin: เหลือเฉพาะบัญชีของฉัน (เปลี่ยนรหัสผ่าน) และออกจากระบบ
+      root.querySelector(".set-wrap")?.classList.add("solo"); root.querySelector(".set-nav")?.remove();
+      ["s-users", "s-spec", "s-data", "s-def"].forEach(id => root.querySelector("#" + id)?.remove());
+      root.querySelectorAll("#s-sys .srow").forEach(r => { if (!r.querySelector("#logout")) r.remove(); });
+      return;
+    }
+
+    /* ---- users (admin) ---- */
+    let users = [];
+    async function loadUsers() {
+      try { users = (await postApi({ action: "listUsers" })).users; } catch (e) { $("#uList").innerHTML = `<p class="muted" style="padding:12px 22px;color:var(--bad)">โหลดผู้ใช้ไม่ได้: ${esc(e.message)}</p>`; return; }
+      $("#uList").innerHTML = `<table class="ctab"><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead><tbody>${users.map(u => `<tr><td class="mono">${esc(u.user)}</td><td>${esc(u.name)}</td><td>${esc(u.role)}</td><td>${u.active ? `<span class="pill ok">ใช้งาน</span>` : `<span class="pill hold">ปิด</span>`}</td><td class="r"><button class="btn sm ghost" data-uedit="${esc(u.user)}" type="button">แก้ไข</button></td></tr>`).join("")}</tbody></table>`;
+    }
+    function userForm(u) {
+      const isNew = !u; u = u || { user: "", name: "", role: "QC", active: true };
+      form(isNew ? "เพิ่มผู้ใช้" : `แก้ไขผู้ใช้ ${u.user}`,
+        fld("f_user", "ชื่อผู้ใช้ (ใช้ล็อกอิน)", `<input class="input" id="f_user" value="${esc(u.user)}" ${isNew ? "" : "readonly"} autocomplete="off" placeholder="เช่น qc07">`)
+        + fld("f_name", "ชื่อที่แสดง", `<input class="input" id="f_name" value="${esc(u.name)}">`)
+        + fld("f_role", "บทบาท", `<select class="select" id="f_role">${ROLES.map(r => `<option ${r === u.role ? "selected" : ""}>${r}</option>`).join("")}</select>`)
+        + fld("f_pass", isNew ? "รหัสผ่าน" : "ตั้งรหัสผ่านใหม่ (เว้นว่าง = ไม่เปลี่ยน)", `<input class="input" id="f_pass" type="password" autocomplete="new-password">`)
+        + `<div class="field" style="display:flex;align-items:center;justify-content:space-between"><label>เปิดใช้งาน</label><button class="switch" id="f_active" aria-checked="${u.active ? "true" : "false"}" type="button"></button></div>`
+        + (isNew ? "" : `<button class="btn sm ghost danger" id="f_del" type="button" style="margin-top:6px">🗑 ลบผู้ใช้นี้</button>`),
+        async b => {
+          const rec = { user: b.querySelector("#f_user").value.trim().toLowerCase(), name: b.querySelector("#f_name").value.trim(), role: b.querySelector("#f_role").value, active: swOn(b.querySelector("#f_active")), pass: b.querySelector("#f_pass").value };
+          if (!rec.name) return "กรอกชื่อที่แสดง"; if (isNew && rec.pass.length < 4) return "รหัสผ่านต้องยาวอย่างน้อย 4 ตัวอักษร"; if (rec.pass && rec.pass.length < 4) return "รหัสผ่านต้องยาวอย่างน้อย 4 ตัวอักษร";
+          if (!rec.pass) delete rec.pass;
+          await postApi({ action: "saveUser", user: rec }); toast(`<b>บันทึกผู้ใช้ ${esc(rec.user)} แล้ว</b>${rec.pass && !isNew ? " · ผู้ใช้ต้องล็อกอินใหม่" : ""}`); loadUsers();
+        });
+      $("#f_del")?.addEventListener("click", async () => {
+        if (!confirm(`ลบผู้ใช้ ${u.user} (${u.name}) ถาวร?`)) return;
+        try { await postApi({ action: "deleteUser", user: u.user }); $("#sModal").classList.add("hide"); toast(`<b>ลบผู้ใช้ ${esc(u.user)} แล้ว</b>`); loadUsers(); } catch (e) { $("#sModalErr").textContent = e.message; }
+      });
+    }
+    $("#uAdd").addEventListener("click", () => userForm(null));
+    $("#uList").addEventListener("click", e => { const b = e.target.closest("[data-uedit]"); if (b) userForm(users.find(u => u.user === b.dataset.uedit)); });
+
+    /* ---- customer specs (admin) ---- */
+    const SPEC_LBL = { color: "Color (IU)", pol: "Polarization (%)", moist: "Moisture (%)", invert: "Invert Sugar (%)", ma: "Target M.A (mm)", ash: "Conductivity Ash (%)", sed: "Sediment" };
+    async function loadSpecs() {
+      await loadQuality(true); const list = Q.specs || [];
+      $("#spList").innerHTML = list.length ? `<table class="ctab"><thead><tr><th>ลูกค้า</th><th>ผลิตภัณฑ์</th><th>เกรด</th><th>สี</th><th></th></tr></thead><tbody>${list.map(sp => `<tr><td>${esc(sp.name)}${sp.alt ? `<small class="muted"> / ${esc(sp.alt)}</small>` : ""}</td><td>${esc(sp.product || "—")}</td><td>${esc(sp.grade || "—")}</td><td>${esc((sp.t || {}).color || "—")}</td><td class="r"><button class="btn sm ghost" data-spedit="${sp.id}" type="button">แก้ไข</button></td></tr>`).join("")}</tbody></table>` : `<p class="muted" style="padding:12px 22px">ยังไม่มีสเปคลูกค้า · กด “นำเข้าข้อมูล” ในหัวข้อฐานข้อมูล หรือ “+ เพิ่มสเปค”</p>`;
+    }
+    function specForm(sp) {
+      const isNew = !sp; sp = sp || { code: "", name: "", alt: "", product: "", t: {} };
+      const products = [...new Set((Q.specs || []).map(x => x.product).filter(Boolean))];
+      form(isNew ? "เพิ่มสเปคลูกค้า" : `แก้ไขสเปค ${sp.name}`,
+        fld("f_sname", "ชื่อลูกค้า", `<input class="input" id="f_sname" value="${esc(sp.name)}">`)
+        + `<div class="grid-2">${fld("f_salt", "ชื่ออื่น (ไม่บังคับ)", `<input class="input" id="f_salt" value="${esc(sp.alt || "")}">`)}${fld("f_scode", "รหัสลูกค้า", `<input class="input" id="f_scode" value="${esc(sp.code || "")}">`)}</div>`
+        + fld("f_sprod", "ผลิตภัณฑ์ (กำหนดเกรด: มีคำว่า DCR / Golden / VHP / Organic / White)", `<input class="input" id="f_sprod" list="spProds" value="${esc(sp.product || "")}"><datalist id="spProds">${products.map(p => `<option value="${esc(p)}">`).join("")}</datalist>`)
+        + `<p class="muted" style="font-size:12.5px;margin:4px 0 2px">ค่าสเปค พิมพ์ได้แบบ “1,600 ICU Max”, “300-800 ICU”, “≥ 99.0% Min”, “> 800” หรือ “-” = ไม่กำหนด</p>`
+        + `<div class="grid-2">${SPEC_KEYS.map(k => fld("f_t_" + k, SPEC_LBL[k], `<input class="input" id="f_t_${k}" value="${esc((sp.t || {})[k] || "")}">`)).join("")}</div>`
+        + (isNew ? "" : `<button class="btn sm ghost danger" id="f_sdel" type="button" style="margin-top:6px">🗑 ลบสเปคนี้</button>`),
+        async b => {
+          const rec = { id: sp.id, name: b.querySelector("#f_sname").value.trim(), alt: b.querySelector("#f_salt").value.trim(), code: b.querySelector("#f_scode").value.trim(), product: b.querySelector("#f_sprod").value.trim(), t: Object.fromEntries(SPEC_KEYS.map(k => [k, b.querySelector("#f_t_" + k).value.trim()])) };
+          if (!rec.name) return "กรอกชื่อลูกค้า"; if (!gradeOfProduct(rec.product)) return "ผลิตภัณฑ์ต้องมีคำที่บอกเกรด (DCR / Golden / VHP / Organic / White)";
+          await postApi({ action: "saveSpec", spec: rec }); toast(`<b>บันทึกสเปค ${esc(rec.name)} แล้ว</b>`); loadSpecs();
+        });
+      $("#f_sdel")?.addEventListener("click", async () => {
+        if (!confirm(`ลบสเปคของ ${sp.name} (${sp.product}) ถาวร?`)) return;
+        try { await postApi({ action: "deleteSpec", id: sp.id }); $("#sModal").classList.add("hide"); toast("<b>ลบสเปคแล้ว</b>"); loadSpecs(); } catch (e) { $("#sModalErr").textContent = e.message; }
+      });
+    }
+    $("#spAdd").addEventListener("click", () => specForm(null));
+    $("#spList").addEventListener("click", e => { const b = e.target.closest("[data-spedit]"); if (b) specForm((Q.specs || []).find(x => String(x.id) === b.dataset.spedit)); });
+
+    /* ---- database status / import / test-data cleanup (admin) ---- */
+    async function dbStatus() {
+      try {
+        const j = await apiFetch(apiUrl() + "?action=ping&_=" + Date.now()).then(r => r.json()); const c = j.counts || {};
+        $("#dbPill").className = "pill ok"; $("#dbPill").textContent = "เชื่อมต่อแล้ว";
+        $("#dbCounts").textContent = `${fmtInt(c.lots || 0)} Lot · ${fmtInt(c.specs || 0)} สเปค · ${fmtInt(c.users || 0)} ผู้ใช้ · ${fmtInt(c.dispatch || 0)} จ่ายออก · ${fmtInt(c.coa || 0)} COA`;
+      } catch (e) { $("#dbPill").className = "pill hold"; $("#dbPill").textContent = "เชื่อมต่อไม่ได้"; $("#dbCounts").textContent = e.message; }
+    }
+    $("#impBtn").addEventListener("click", async () => {
+      if (!confirm("นำเข้าข้อมูลจาก Google Sheets เข้าฐานข้อมูล Cloudflare?\n\n• Quality และ Spec จะแทนที่ข้อมูลในฐานข้อมูลทั้งหมด\n• ผู้ใช้ จะใช้รหัสผ่านตามชีต Users\n• ข้อมูลในชีตไม่ถูกลบ")) return;
+      const logEl = $("#impLog"), btn = $("#impBtn"); logEl.classList.remove("hide"); logEl.textContent = ""; btn.disabled = true;
+      const log = t => { logEl.textContent += t + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+      try { await importFromSheets(log); log("✓ เสร็จแล้ว"); toast("<b>นำเข้าข้อมูลเสร็จแล้ว</b>", 3000); localStorage.removeItem("qc.quality"); Q.rows = null; Q.specs = null; dbStatus(); loadUsers(); loadSpecs(); }
+      catch (e) { log("✕ หยุด: " + e.message); toast(`<b>นำเข้าไม่สำเร็จ</b> ${esc(e.message)}`, 4000); }
+      finally { btn.disabled = false; }
+    });
+    $("#syncBtn").addEventListener("click", async () => { toast("กำลังส่ง…"); const r = await syncEdits(); toast(r.failed ? `<b>ส่งได้ ${r.done} ไม่สำเร็จ ${r.failed}</b> ${esc(r.lastErr)}` : `<b>ส่งแล้ว ${r.done} รายการ</b>`); refresh(); });
+    const clearData = async (label, action, keys) => {
+      if (!confirm(`ล้าง${label}ทั้งหมดออกจากฐานข้อมูลและในเครื่อง?\nการลบนี้ย้อนกลับไม่ได้`)) return;
+      keys.forEach(k => localStorage.removeItem(k)); toast("กำลังล้าง…");
+      try { const j = await postApi({ action }); toast(`<b>ล้าง${label}แล้ว</b> ลบ ${j.cleared || 0} รายการ`, 3200); dbStatus(); } catch (e) { toast(`<b>ล้างในเครื่องแล้ว</b> แต่ลบในฐานข้อมูลไม่ได้: ${esc(e.message || "")}`, 3600); }
+    };
+    $("#clearDpBtn").addEventListener("click", () => clearData("บันทึกจ่ายออก", "clearDispatch", ["qc.dispatch", "qc.dispatch.queue", "qc.dispatch.draft"]));
+    $("#clearCoaBtn").addEventListener("click", () => clearData("ใบ COA", "clearCoa", ["qc.coa", "qc.coa.queue"]));
+    dbStatus(); loadUsers(); loadSpecs();
   },
 };
+
+/* ---------- one-time import: Google Sheets / Apps Script (ระบบเดิม) → Cloudflare D1 ---------- */
+async function importFromSheets(log) {
+  const oldGet = async q => { const r = await fetch(OLD_SCRIPT_URL + "?" + q + "&_=" + Date.now()); return r.json(); };
+  log("อ่านชีต Quality และ Spec …");
+  const [qt, st] = await Promise.all([fetchSheet(SHEET_DEFAULT.quality), fetchSheet(SHEET_DEFAULT.spec)]);
+  const rows = mapQuality(qt).map(r => { const o = { ...r }; delete o.dk; return o; });
+  const specs = mapSpec(st).map(sp => ({ code: sp.code, name: sp.name, alt: sp.alt, product: sp.product, t: Object.fromEntries(SPEC_KEYS.map(k => [k, sp.rules[k] ? sp.rules[k].text : ""])) }));
+  log(`  พบ ${rows.length} Lot · ${specs.length} สเปค`);
+  for (let i = 0; i < rows.length; i += 300) { await postApi({ action: "importData", replace: i === 0, quality: rows.slice(i, i + 300) }); log(`  ส่ง Lot ${Math.min(i + 300, rows.length)}/${rows.length}`); }
+  await postApi({ action: "importData", specs }); log("  ส่งสเปคแล้ว");
+
+  // รหัส Repack อยู่ในชีต Quality คอลัมน์ V เป็นต้นไป ; วันที่อยู่ในโน้ตของเซลล์ → ถามจากสคริปต์เดิม
+  const labels = qt.cols.map(c => (c.label || "").trim()); const kix = labels.indexOf("Lot (Strike)");
+  const withRepack = qt.rows.filter(r => r.c.slice(21).some(c => c && /^R\d{5}$/.test(String(c.v ?? "").trim()))).map(r => String((r.c[kix] && (r.c[kix].f ?? r.c[kix].v)) ?? "").trim()).filter(Boolean);
+  const repack = [];
+  for (const strike of withRepack) { try { const j = await oldGet("action=getRepack&strike=" + encodeURIComponent(strike)); (j.records || []).forEach(x => { if (/^\d{4}-\d{2}-\d{2}$/.test(x.date)) repack.push({ strike, day: x.date, rcode: x.value }); }); } catch (e) { log(`  ข้าม Repack ของ Lot ${strike}: ${e.message}`); } }
+  if (repack.length) await postApi({ action: "importData", repack }); log(`  Repack ${repack.length} รายการ จาก ${withRepack.length} Lot`);
+
+  log("อ่านชีต Users …");
+  try {
+    const ut = await fetchSheet("Users"); const ul = ut.cols.map(c => (c.label || "").trim()); const g = (r, n) => { const i = ul.indexOf(n); return i >= 0 && r.c[i] ? String(r.c[i].f ?? r.c[i].v ?? "").trim() : ""; };
+    const us = ut.rows.map(r => ({ user: g(r, "Username"), pass: g(r, "Password"), name: g(r, "Name"), role: g(r, "Role"), active: !/^(N|FALSE)$/i.test(g(r, "Active")) })).filter(u => u.user && u.pass);
+    for (let i = 0; i < us.length; i += 4) await postApi({ action: "importData", users: us.slice(i, i + 4) }); // ทีละน้อย เพราะการเข้ารหัสรหัสผ่านใช้ CPU
+    log(`  ผู้ใช้ ${us.length} คน (ใช้รหัสผ่านตามชีต)`);
+  } catch (e) { log("  อ่านชีต Users ไม่ได้ (" + e.message + ") — ใช้ผู้ใช้และรหัสผ่านเริ่มต้นในฐานข้อมูลแทน"); }
+
+  log("อ่านบันทึกจ่ายออกและใบ COA จากสคริปต์เดิม …");
+  try { const d = await oldGet("action=getDispatch"); const recs = (d.records || []).map(r => { const o = { ...r }; delete o.photoUrls; return o; }); if (recs.length) await postApi({ action: "importData", dispatch: recs }); log(`  บันทึกจ่ายออก ${recs.length} ใบ (รูปถ่ายเดิมยังอยู่ใน Google Drive)`); } catch (e) { log("  อ่านบันทึกจ่ายออกไม่ได้: " + e.message); }
+  try { const c = await oldGet("action=getCoa"); const recs = c.records || []; if (recs.length) await postApi({ action: "importData", coa: recs }); log(`  ใบ COA ${recs.length} ใบ`); } catch (e) { log("  อ่านใบ COA ไม่ได้: " + e.message); }
+}
 
 
 route(); renderPhone();
