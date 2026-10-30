@@ -1003,6 +1003,8 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .set-wrap { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: start; }
 .set-wrap.solo { grid-template-columns: 1fr; max-width: 640px; margin: 0 auto; }
 .s-tbl { padding: 0 14px 14px; } .s-tbl .ctab td.r { text-align: right; } .s-tbl .mono { font-variant-numeric: tabular-nums; }
+.srow.wide .sctl .au-range { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; }
+.srow.wide .sctl .au-range .input { width: auto; flex: 0 1 180px; min-width: 140px; } .au-range span { color: var(--ink-3); }
 .slog { margin: 0 22px 12px; padding: 10px 12px; max-height: 220px; overflow: auto; border-radius: 12px; background: var(--paper-2); font: 12.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--ink-2); }
 .set-nav { position: sticky; top: 76px; display: grid; gap: 4px; padding: 8px; border-radius: 20px; background: rgba(255,253,248,.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-panel); }
 .set-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px; color: var(--ink-2); text-decoration: none; transition: background .15s, color .15s; }
@@ -2982,6 +2984,7 @@ views.settings = {
         ${srow("info", "ข้อมูลในฐานข้อมูล", "", `<span class="sval" id="dbCounts">—</span>`)}
         ${srow("upload", "นำเข้าจาก Google Sheets", "คัดลอก Quality, Spec, Users, บันทึกจ่ายออก, ใบ COA และ Repack จากระบบเดิม (ข้อมูลในชีตไม่ถูกลบ)", `<button class="btn sm ghost" id="impBtn" type="button">นำเข้าข้อมูล</button>`)}
         <pre class="slog hide" id="impLog"></pre>
+        ${srow("upload", "Export สำหรับ Audit", "ไฟล์ Excel: สรุป · บันทึกจ่ายออก (ครบทุกช่อง) · Lot ที่จ่ายออก · ใบ COA · ผลวิเคราะห์ COA · ประวัติการทำงาน", `<div class="srow-btns au-range"><input class="input" id="auFrom" type="date" aria-label="ตั้งแต่วันที่"><span>–</span><input class="input" id="auTo" type="date" aria-label="ถึงวันที่"><button class="btn sm" id="auBtn" type="button">⬇ Export</button></div>`, "wide")}
         ${srow("sync", "การแก้ไข Lot ที่รอส่ง", "แก้ไขตอนออฟไลน์ จะส่งขึ้นฐานข้อมูลเมื่อออนไลน์", `<div class="row"><b id="pendingN" class="num"></b><button class="btn sm ghost" id="syncBtn" type="button">ส่งตอนนี้</button></div>`)}
         ${srow("broom", "ล้างข้อมูลทดสอบ", "ลบบันทึกจ่ายออก / ใบ COA ทั้งหมดออกจากฐานข้อมูลและในเครื่อง", `<div class="srow-btns"><button class="btn sm ghost danger" id="clearDpBtn" type="button">ล้างบันทึกจ่ายออก</button><button class="btn sm ghost danger" id="clearCoaBtn" type="button">ล้างใบ COA</button></div>`)}
       </section>
@@ -3148,6 +3151,15 @@ views.settings = {
       catch (e) { log("✕ หยุด: " + e.message); toast(`<b>นำเข้าไม่สำเร็จ</b> ${esc(e.message)}`, 4000); }
       finally { btn.disabled = false; }
     });
+    // ค่าเริ่มต้น: ตั้งแต่ 1 ธ.ค. ของฤดูหีบล่าสุด ถึงวันนี้
+    { const d = new Date(); const y = d.getMonth() >= 11 ? d.getFullYear() : d.getFullYear() - 1; $("#auFrom").value = `${y}-12-01`; $("#auTo").value = todayIso(); }
+    $("#auBtn").addEventListener("click", async () => {
+      const from = $("#auFrom").value, to = $("#auTo").value; if (!from || !to) { toast("เลือกช่วงวันที่ก่อน"); return; } if (from > to) { toast("วันที่เริ่มต้องไม่เกินวันที่สิ้นสุด"); return; }
+      const b = $("#auBtn"); b.disabled = true; b.textContent = "กำลังสร้างไฟล์…";
+      try { await loadQuality(false); const r = await exportAudit(from, to); toast(`<b>ดาวน์โหลด ${esc(r.name)} แล้ว</b> จ่ายออก ${r.dispatch} ใบ · COA ${r.coa} ใบ · ประวัติ ${r.history} รายการ`, 4500); }
+      catch (e) { toast(`<b>Export ไม่สำเร็จ</b> ${esc(e.message)}`, 4000); }
+      finally { b.disabled = false; b.textContent = "⬇ Export"; }
+    });
     $("#syncBtn").addEventListener("click", async () => { toast("กำลังส่ง…"); const r = await syncEdits(); toast(r.failed ? `<b>ส่งได้ ${r.done} ไม่สำเร็จ ${r.failed}</b> ${esc(r.lastErr)}` : `<b>ส่งแล้ว ${r.done} รายการ</b>`); refresh(); });
     const clearData = async (label, action, keys) => {
       if (!confirm(`ล้าง${label}ทั้งหมดออกจากฐานข้อมูลและในเครื่อง?\nการลบนี้ย้อนกลับไม่ได้`)) return;
@@ -3192,6 +3204,69 @@ async function importFromSheets(log) {
   try { const c = await oldGet("action=getCoa"); const recs = c.records || []; if (recs.length) await postApi({ action: "importData", coa: recs }); log(`  ใบ COA ${recs.length} ใบ`); } catch (e) { log("  อ่านใบ COA ไม่ได้: " + e.message); }
 }
 
+
+/* ---------- Export สำหรับ Audit: ไฟล์ Excel หลายชีต (บันทึกจ่ายออก · Lot ต่อรถ · ใบ COA · ผลวิเคราะห์ COA · ประวัติการทำงาน) ---------- */
+const loadXlsx = () => window.XLSX ? Promise.resolve(window.XLSX) : new Promise((res, rej) => {
+  const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error("โหลดตัวสร้างไฟล์ Excel ไม่ได้ ตรวจสอบอินเทอร์เน็ต")); document.head.appendChild(s);
+});
+async function exportAudit(from, to) {
+  const get = async action => { const j = await apiFetch(apiUrl() + "?action=" + action + "&_=" + Date.now()).then(r => r.json()); if (!j.ok) throw new Error(j.error || "โหลดข้อมูลไม่ได้"); return j.records; };
+  const [XLSX, dispAll, coaAll] = await Promise.all([loadXlsx(), get("getDispatch"), get("getCoa")]);
+  const inRange = d => !!d && d >= from && d <= to;
+  const disp = dispAll.filter(r => r.status !== "draft" && inRange(r.date)).sort((a, b) => (a.date || "").localeCompare(b.date || "") || (+a.id || 0) - (+b.id || 0));
+  const coa = coaAll.filter(r => inRange(r.reqDate)).sort((a, b) => (a.reqDate || "").localeCompare(b.reqDate || "") || (a.certNo || "").localeCompare(b.certNo || ""));
+  const ts = v => v ? fmtTs(v) : "";
+  const docNo = r => "#" + String(r.id || 0).padStart(4, "0");
+  const stDp = s => (DP.STATUS[s] || [s || ""])[0], stCoa = r => r.cancelled ? "ยกเลิก" : (COA_STATUS[r.status] || [r.status || ""])[0];
+
+  const dispRows = disp.map(r => {
+    const checks = Object.fromEntries(DP.CHECKS.map(c => [c.name, r.checks && r.checks[c.id] ? (r.checks[c.id] === "a" ? c.a : c.b) : ""]));
+    return { "เลขที่": docNo(r), "วันที่": isoToDmy(r.date), "สถานะ": stDp(r.status), "ทะเบียนรถ": r.plate || "", "ประเภทรถ": r.truckType || "", "บริษัทขนส่ง": r.transport || "", "ลูกค้าปลายทาง": r.customer || "",
+      "ขอใบ COA": r.coa ? "ขอ" : "", "ปีการผลิต/ฤดู": r.prodYear || "", "เวลาเริ่มขึ้นน้ำตาล": r.timeStart || "", "เวลาขึ้นเสร็จ": r.timeEnd || "", "ชนิดน้ำตาล": r.sugarType || "", "ขนาดบรรจุ": r.pack || "", "คลัง": r.bay || "",
+      "Lot": (r.lots || []).map(l => l.no).filter(Boolean).join(", "), "จำนวนกระสอบ": dpBags(r), "ตัน": +r.tons || dpTons(r) || 0,
+      ...checks, "รายการที่ไม่ผ่าน": dpFails(r).map(c => c.name).join(" / "), "ผ้าใบ / Seal": r.tarp || "", "Seal No.": r.seal || "", "หมายเหตุ": r.note || "", "หมายเหตุอื่น": r.otherNote || "",
+      "พนักงานขับรถ": r.driverName || "", "หัวหน้ากะโลจิสติกส์": r.logisticsName || "", "ผู้บันทึก": (r.recordedBy && r.recordedBy.name) || "", "ผู้ตรวจสอบ (QA)": (r.checkedBy && r.checkedBy.name) || "", "ผู้อนุมัติ": (r.approvedBy && r.approvedBy.name) || "",
+      "เหตุผลส่งกลับแก้ไข": r.returnNote || "", "เหตุผลไม่ผ่านอนุมัติ": r.rejectNote || "", "จำนวนรูปถ่าย": (r.photoUrls || []).length };
+  });
+  const lotRows = disp.flatMap(r => (r.lots || []).filter(l => l.no).map(l => { const q = (Q.rows || []).find(x => x.strike === String(l.no));
+    return { "เลขที่ใบจ่ายออก": docNo(r), "วันที่จ่ายออก": isoToDmy(r.date), "ทะเบียนรถ": r.plate || "", "ลูกค้าปลายทาง": r.customer || "", "Lot": String(l.no), "จำนวนกระสอบ": +l.bags || 0, "R (Repack)": l.r ? (l.rNum || "✓") : "",
+      "เกรด": q ? q.grade : "", "วันผลิต": q ? q.date : "", "สถานะ Spec": q ? q.status : "", "สถานะใบจ่ายออก": stDp(r.status) }; }));
+  const coaRows = coa.map(r => ({ "เลขที่ใบ": r.certNo, "แบบฟอร์ม": r.form || "", "สถานะ": stCoa(r), "Date": isoToDmy(r.reqDate), "COA Request No. (ฝกต.)": r.reqNo || "", "Company of Customer Request": r.customer || "", "Company of Import": r.importer || "",
+    "Truck No.": coaTrucksOf(r).join(", "), "Grade of Sugar": r.grade || "", "Lot Number": r.lotNumber || "", "Export Invoice NO": r.invoiceNo || "", "S/O": r.soNo || "", "Booking": r.booking || "", "PACKED IN": r.packIn || "", "Ton": r.packedTons || "",
+    "Shipment Lot Number": r.shipmentLot || "", "Remark": r.remark || "", "Lot ที่รับรอง": (r.lots || []).map(l => l.strike).join(", "), "Lot ไม่ผ่านสเปค": (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(", "),
+    "Reporter": r.reporter || "", "Approved by": r.approvedBy || "", "ผู้สร้างคำขอ": r.requestedBy || "", "เวลาสร้างคำขอ": ts(r.requestedAt), "เวลาส่งอนุมัติ": ts(r.submittedAt), "เวลาอนุมัติ": ts(r.approvedAt),
+    "เหตุผลยกเลิก": r.cancelReason || "", "ยกเลิกโดย": r.cancelledBy || "", "เวลายกเลิก": ts(r.cancelledAt) }));
+  const resRows = coa.flatMap(r => (r.lots || []).map(l => ({ "เลขที่ใบ": r.certNo, "สถานะใบ": stCoa(r), "ลูกค้า": r.customer || "", "Lot": l.strike, "Production date": l.prodDate || "", "Best before": l.bestBefore || "",
+    ...Object.fromEntries(COA_COLS.flatMap(c => [[`${c[1]} (${c[2]})`, l[c[0]] ?? ""], [`Spec ${c[1]}`, (r.spec || {})[c[0]] || ""]])), "ผลเทียบสเปค": (l.fails || []).length ? "ไม่ผ่าน: " + l.fails.join(" · ") : "ผ่าน" })));
+  const histRows = [
+    ...disp.flatMap(r => (r.log || []).map(x => ({ "เวลา": ts(x.ts), "_t": x.ts || "", "เอกสาร": "บันทึกจ่ายออก", "เลขที่": docNo(r), "ทะเบียนรถ": r.plate || "", "การกระทำ": DP.ACTIONS[x.action] || x.action, "โดย": x.by || "", "หมายเหตุ": x.note || "" }))),
+    ...coa.flatMap(r => [[r.requestedAt, "สร้างคำขอ (ส่วนที่ 1)", r.requestedBy, ""], [r.submittedAt, "QA ส่งให้ผู้อนุมัติ", r.submittedBy, ""], [r.approvedAt, "อนุมัติใบ COA", r.approvedActionBy, ""], [r.cancelledAt, "ยกเลิกใบ COA", r.cancelledBy, r.cancelReason]]
+      .filter(x => x[0]).map(([t, a, by, note]) => ({ "เวลา": ts(t), "_t": t, "เอกสาร": "ใบ COA", "เลขที่": r.certNo, "ทะเบียนรถ": coaTrucksOf(r).join(", "), "การกระทำ": a, "โดย": by || "", "หมายเหตุ": note || "" }))),
+  ].sort((a, b) => String(a._t).localeCompare(String(b._t))).map(x => { delete x._t; return x; });
+
+  const summary = [["QC Time · รายงานสำหรับการตรวจสอบ (Audit)"], ["Mitr Lao Sugar Co., Ltd. · แผนกควบคุมคุณภาพ"], [],
+    ["ช่วงวันที่", `${isoToDmy(from)} – ${isoToDmy(to)}`], ["ส่งออกเมื่อ", fmtTs(Date.now())], ["ส่งออกโดย", getUser().name], ["แหล่งข้อมูล", "ฐานข้อมูล QC Time (Cloudflare D1)"], [],
+    ["บันทึกการจ่ายออก (ไม่รวมร่าง)", disp.length], ["  สำเร็จ", disp.filter(r => r.status === "done").length], ["  อยู่ระหว่างดำเนินการ", disp.filter(r => ["wait_check", "wait_approve", "returned", "rejected"].includes(r.status)).length],
+    ["  รวมน้ำหนัก (ตัน)", +disp.reduce((s, r) => s + (+r.tons || dpTons(r) || 0), 0).toFixed(3)], ["  รถที่มีรายการตรวจไม่ผ่าน", disp.filter(r => dpFails(r).length).length], [],
+    ["ใบ COA", coa.length], ["  อนุมัติแล้ว", coa.filter(r => r.status === "issued" && !r.cancelled).length], ["  ยกเลิก", coa.filter(r => r.cancelled).length], ["  Lot ที่รับรอง", resRows.length], ["  Lot ไม่ผ่านสเปค", resRows.filter(x => x["ผลเทียบสเปค"] !== "ผ่าน").length], [],
+    ["ชีตในไฟล์นี้"], ["บันทึกจ่ายออก", "1 แถวต่อ 1 ใบ ครบทุกช่องของแบบฟอร์ม ML-FM-1610-012 รวมผลตรวจสภาพรถทั้ง 10 ข้อ"], ["Lot ที่จ่ายออก", "1 แถวต่อ 1 Lot ต่อ 1 คันรถ ใช้ตามรอย Lot → รถ → ลูกค้า"],
+    ["ใบ COA", "1 แถวต่อ 1 ใบ ตามแบบฟอร์ม ML-FM-1610-037"], ["ผลวิเคราะห์ COA", "ค่าวิเคราะห์และสเปคของทุก Lot ในทุกใบ"], ["ประวัติการทำงาน", "ใคร ทำอะไร เมื่อไร (ส่ง ตรวจ ส่งกลับ อนุมัติ ยกเลิก) เรียงตามเวลา"]];
+
+  const wb = XLSX.utils.book_new();
+  const add = (name, rows, headers) => {
+    const ws = rows.length ? XLSX.utils.json_to_sheet(rows) : XLSX.utils.aoa_to_sheet([headers || ["ไม่มีข้อมูลในช่วงที่เลือก"]]);
+    const keys = rows.length ? Object.keys(rows[0]) : (headers || []);
+    ws["!cols"] = keys.map(k => ({ wch: Math.min(48, Math.max(10, String(k).length + 2, ...rows.slice(0, 200).map(r => String(r[k] ?? "").length + 1))) }));
+    if (rows.length) ws["!autofilter"] = { ref: ws["!ref"] };
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  };
+  const sws = XLSX.utils.aoa_to_sheet(summary); sws["!cols"] = [{ wch: 34 }, { wch: 70 }]; XLSX.utils.book_append_sheet(wb, sws, "สรุป");
+  add("บันทึกจ่ายออก", dispRows); add("Lot ที่จ่ายออก", lotRows); add("ใบ COA", coaRows); add("ผลวิเคราะห์ COA", resRows); add("ประวัติการทำงาน", histRows);
+  const name = `QCTime-Audit-${from.replace(/-/g, "")}-${to.replace(/-/g, "")}.xlsx`;
+  XLSX.writeFile(wb, name);
+  return { name, dispatch: disp.length, coa: coa.length, lots: lotRows.length, history: histRows.length };
+}
 
 route(); renderPhone();
 })();
