@@ -2032,7 +2032,7 @@ const dpFails = d => DP.CHECKS.filter(c => !c.neutral && d.checks && d.checks[c.
 function dpProgress(d) {
   const lots = d.lots || []; const cont = d.truckType === "รถตู้คอนเทนเนอร์ (Container)";
   const steps = [
-    [!!d.date, !!d.timeStart, !!d.plate, !!d.customer, !!d.truckType],
+    [!!d.date, seasonOk(d.prodYear), !!d.timeStart, !!d.plate, !!d.customer, !!d.truckType],
     [...DP.CHECKS.map(c => !!(d.checks && d.checks[c.id])), (d.photos || []).length > 0],
     [!!d.sugarType, !!d.pack, !!d.bay, lots.length > 0 && lots.every(l => l.no && +l.bags > 0)],
     [!!d.tarp, ...(cont ? [!!d.seal] : []), !!d.timeEnd, !!d.driverName, !!d.logisticsName],
@@ -2041,12 +2041,15 @@ function dpProgress(d) {
   return { done, total, pct: total ? Math.round(done / total * 100) : 0, steps: steps.map(a => ({ done: a.filter(Boolean).length, total: a.length })) };
 }
 // ปีการผลิต/ฤดู อัตโนมัติจากปีปัจจุบัน: ปี 2026 → "25 26", ปี 2027 → "26 27"
+// ปีการผลิต/ฤดู รูปแบบ YY/YY (เช่น 25/26): รับเฉพาะตัวเลข 4 หลัก ใส่ / ให้อัตโนมัติ
+const fmtSeason = v => { const d = String(v || "").replace(/\D/g, "").slice(0, 4); return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d; };
+const seasonOk = v => { const m = String(v || "").match(/^(\d{2})\/(\d{2})$/); return !!m && +m[2] === (+m[1] + 1) % 100; };
 const currentSeason = () => { const y = new Date().getFullYear(); const p = n => String(n % 100).padStart(2, "0"); return `${p(y - 1)} ${p(y)}`; };
 function dpNewDraft() {
   const u = getUser(); const recs = dpRecs();
   return { id: recs.reduce((m, r) => Math.max(m, +r.id || 0), 0) + 1, uid: "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     recordedBy: { name: u.name, username: (localStorage.getItem("qc.lastUser") || u.name) }, status: "draft", date: todayIso(),
-    plate: "", transport: "", customer: "", truckType: "", coa: false, timeStart: "", timeEnd: "", prodYear: currentSeason(),
+    plate: "", transport: "", customer: "", truckType: "", coa: false, timeStart: "", timeEnd: "", prodYear: fmtSeason(currentSeason()),
     sugarType: "", pack: "", tons: 0, bay: "", lots: [{ no: "", bags: "", r: false, rNum: "" }],
     tarp: "", seal: "", note: "", otherNote: "", driverName: "", logisticsName: "", sigs: {}, checks: {}, photos: [], log: [] };
 }
@@ -2303,7 +2306,7 @@ views.release = {
       let inner = "";
       if (step === 0) inner = `
         <h3 class="dp-h">วันที่และเวลา</h3>
-        <div class="fgrid">${field("วันที่", `<input class="input" id="w_date" type="date" value="${esc(d.date)}">`, true)}${field("ปีการผลิต / ฤดู", `<input class="input" id="w_prodYear" value="${esc(d.prodYear || currentSeason())}" placeholder="เช่น 25 26">`)}${field("เวลาเริ่มขึ้นน้ำตาล", `<input class="input" id="w_timeStart" type="time" value="${esc(d.timeStart)}">`, true)}</div>
+        <div class="fgrid">${field("วันที่", `<input class="input" id="w_date" type="date" value="${esc(d.date)}">`, true)}${field("ปีการผลิต / ฤดู", `<input class="input" id="w_prodYear" value="${esc(fmtSeason(d.prodYear || currentSeason()))}" placeholder="25/26" inputmode="numeric" maxlength="5" autocomplete="off">`, true)}${field("เวลาเริ่มขึ้นน้ำตาล", `<input class="input" id="w_timeStart" type="time" value="${esc(d.timeStart)}">`, true)}</div>
         <h3 class="dp-h">รถและผู้เกี่ยวข้อง</h3>
         <div class="fgrid">${field("ทะเบียนรถ", `<input class="input" id="w_plate" value="${esc(d.plate)}" placeholder="เช่น ກຂ 1234">`, true)}${field("บริษัทขนส่ง (ไม่บังคับ)", `<input class="input" id="w_transport" value="${esc(d.transport)}" placeholder="ชื่อบริษัทขนส่ง">`)}${field("ลูกค้าปลายทาง", `<input class="input" id="w_customer" data-combo="dpCust" autocomplete="off" value="${esc(d.customer)}" placeholder="ชื่อลูกค้า / ปลายทาง"><datalist id="dpCust">${[...new Set((Q.specs || []).map(s => s.name))].map(c => `<option value="${esc(c)}">`).join("")}</datalist>`, true)}</div>
         <h3 class="dp-h">ประเภทรถบรรทุก <span class="req"></span></h3>${chipsOf("w_truck", DP.TRUCK, d.truckType)}
@@ -2357,7 +2360,7 @@ views.release = {
       return `${withHead ? "" : ""}
         <div class="d-groups">
           <div>
-            <div class="d-group"><h3>ข้อมูลทั่วไป</h3><div class="facts one">${row("วันที่", isoToDmy(d.date))}${row("ทะเบียนรถ", esc(d.plate))}${row("ประเภทรถ", esc(d.truckType))}${row("บริษัทขนส่ง", esc(d.transport))}${row("ลูกค้าปลายทาง", esc(d.customer))}${row("ปีการผลิต", esc(d.prodYear))}${row("เวลาขึ้น", `${esc(d.timeStart || "—")} → ${esc(d.timeEnd || "—")}`)}${row("ใบ COA", d.coa ? "✓ ขอ" : "ไม่ขอ")}</div></div>
+            <div class="d-group"><h3>ข้อมูลทั่วไป</h3><div class="facts one">${row("วันที่", isoToDmy(d.date))}${row("ทะเบียนรถ", esc(d.plate))}${row("ประเภทรถ", esc(d.truckType))}${row("บริษัทขนส่ง", esc(d.transport))}${row("ลูกค้าปลายทาง", esc(d.customer))}${row("ปีการผลิต", esc(fmtSeason(d.prodYear)))}${row("เวลาขึ้น", `${esc(d.timeStart || "—")} → ${esc(d.timeEnd || "—")}`)}${row("ใบ COA", d.coa ? "✓ ขอ" : "ไม่ขอ")}</div></div>
             <div class="d-group"><h3>1. สภาพรถก่อนโหลด</h3>${fails.length ? `<div class="facts one">${fails.map(c => row(c.name, `<span class="bad">✕ ${c.b}</span>`)).join("")}</div>` : `<div class="okline">✓ ผ่านทุกรายการ (${DP.CHECKS.length})</div>`}${d.otherNote ? `<div class="facts one">${row("อื่นๆ", esc(d.otherNote))}</div>` : ""}${(d.photos || []).length || (d.photoUrls || []).length ? `<div class="dp-thumbs">${(d.photos && d.photos.length ? d.photos : d.photoUrls).map(p => `<img src="${p}" alt="" data-light="${p}">`).join("")}</div>` : ""}</div>
           </div>
           <div>
@@ -2396,7 +2399,7 @@ views.release = {
 function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); if (!fill) return; fill.style.width = p.pct + "%"; $("#dpProgPct").textContent = p.pct + "%"; $("#dpProgTxt").textContent = `กรอกแล้ว ${p.done}/${p.total} ช่องบังคับ`; $("#dpProg").setAttribute("aria-valuenow", p.pct); fill.classList.toggle("full", p.pct === 100); }
     function readStep() {
       const d = draft; const g = id => { const el = $("#" + id); return el ? el.value.trim() : undefined; };
-      if (step === 0) { d.date = g("w_date") || d.date; d.prodYear = g("w_prodYear"); d.timeStart = g("w_timeStart"); d.plate = g("w_plate"); d.transport = g("w_transport"); d.customer = g("w_customer"); d.truckType = chipValue($("#w_truck")); d.coa = swOn($("#w_coa")); }
+      if (step === 0) { d.date = g("w_date") || d.date; d.prodYear = fmtSeason(g("w_prodYear")); d.timeStart = g("w_timeStart"); d.plate = g("w_plate"); d.transport = g("w_transport"); d.customer = g("w_customer"); d.truckType = chipValue($("#w_truck")); d.coa = swOn($("#w_coa")); }
       if (step === 1) { d.otherNote = g("w_otherNote"); }
       if (step === 2) { d.sugarType = g("w_sugarType"); d.pack = g("w_pack"); d.bay = chipValue($("#w_bay")); root.querySelectorAll(".lot-row").forEach((row, i) => { d.lots[i].no = row.querySelector(".lotno").value.trim(); d.lots[i].bags = row.querySelector(".bags input").value.trim(); const rc = row.querySelector(".rchk"); if (rc) d.lots[i].r = rc.checked; const rn = row.querySelector(".rnum"); if (rn) d.lots[i].rNum = rn.value.trim(); }); d.tons = dpTons(d); }
       if (step === 3) { d.tarp = chipValue($("#w_tarp")); d.seal = g("w_seal"); d.timeEnd = g("w_timeEnd"); d.note = g("w_note"); d.driverName = g("w_driverName"); d.logisticsName = g("w_logisticsName"); }
@@ -2404,7 +2407,7 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
     }
     function validateStep() {
       const d = draft;
-      if (step === 0) { if (!d.date) return "กรุณาเลือกวันที่"; if (!d.timeStart) return "กรุณาระบุเวลาเริ่มขึ้นน้ำตาล"; if (!d.plate) return "กรุณากรอกทะเบียนรถ"; if (!d.customer) return "กรุณากรอกลูกค้าปลายทาง"; if (!d.truckType) return "กรุณาเลือกประเภทรถบรรทุก"; }
+      if (step === 0) { if (!d.date) return "กรุณาเลือกวันที่"; if (!/^\d{2}\/\d{2}$/.test(d.prodYear || "")) return "กรอกปีการผลิต / ฤดู ให้ครบ 4 หลัก เช่น 25/26"; if (!seasonOk(d.prodYear)) return "ปีการผลิต / ฤดู ต้องเป็นปีติดกัน เช่น 25/26"; if (!d.timeStart) return "กรุณาระบุเวลาเริ่มขึ้นน้ำตาล"; if (!d.plate) return "กรุณากรอกทะเบียนรถ"; if (!d.customer) return "กรุณากรอกลูกค้าปลายทาง"; if (!d.truckType) return "กรุณาเลือกประเภทรถบรรทุก"; }
       if (step === 1) { const miss = DP.CHECKS.filter(c => !d.checks[c.id]); if (miss.length) return `ยังไม่ได้ตรวจ: ${miss[0].name} (เหลือ ${miss.length} รายการ)`; if (!(d.photos || []).length) return "กรุณาแนบรูปสภาพรถอย่างน้อย 1 รูป"; }
       if (step === 2) { if (!d.sugarType) return "กรุณาเลือกชนิดน้ำตาล"; if (!d.pack) return "กรุณาเลือกขนาดบรรจุ"; if (!d.bay) return "กรุณาเลือกคลังที่ขึ้นน้ำตาล"; if (!d.lots.length) return "กรุณาเพิ่มอย่างน้อย 1 Lot"; const bad = d.lots.findIndex(l => !l.no || !(+l.bags > 0)); if (bad >= 0) return `Lot ที่ ${bad + 1} ยังไม่ครบ (เลือก Lot / จำนวนกระสอบ)`; const notInDb = d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน")); if (notInDb >= 0) return `Lot ที่ ${notInDb + 1} (${esc(d.lots[notInDb].no)}) ไม่มีในฐานข้อมูลหรือไม่ผ่าน จ่ายออกไม่ได้`; if (!(dpTons(d) > 0)) return "จำนวนบรรทุกต้องมากกว่า 0 ตัน"; }
       if (step === 3) { if (!d.tarp) return "กรุณาเลือกสถานะการปกผ้าใบ / Seal"; if (d.truckType === "รถตู้คอนเทนเนอร์ (Container)" && !d.seal) return "กรุณากรอก Seal No. สำหรับตู้คอนเทนเนอร์"; if (!d.timeEnd) return "กรุณาระบุเวลาขึ้นเสร็จ"; if (!d.driverName) return "กรุณาพิมพ์ชื่อพนักงานขับรถ"; if (!d.logisticsName) return "กรุณาพิมพ์ชื่อหัวหน้ากะโลจิสติกส์"; }
@@ -2416,6 +2419,7 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
       if (mode === "wizard") {
         initChips(body); initSwitches(body);
         body.querySelectorAll("input, select, textarea").forEach(el => { el.addEventListener("change", readStep); el.addEventListener("input", readStep); });
+        $("#w_prodYear")?.addEventListener("input", e => { const el = e.target, v = fmtSeason(el.value); if (el.value !== v) { el.value = v; el.setSelectionRange(v.length, v.length); } draft.prodYear = v; }); // ล็อกรูปแบบ YY/YY
         body.addEventListener("click", () => setTimeout(() => { if (draft && mode === "wizard") readStep(); }, 0)); // ชิปตัวเลือก / สวิตช์ ไม่ยิง change
         $("#w_cancel").addEventListener("click", async () => { if (step > 0) { readStep(); step--; renderMain(); return; } if (await ask("ยกเลิกการบันทึก", "ร่างนี้จะถูกลบและกู้คืนไม่ได้")) { draft = null; editUid = null; saveDraftState(); mode = "empty"; renderEntry(); } });
         $("#w_saveExit").addEventListener("click", () => { readStep(); toast("💾 บันทึกร่างไว้แล้ว"); draft = null; mode = "empty"; renderEntry(); });
@@ -3223,7 +3227,7 @@ async function exportAudit(from, to) {
   const dispRows = disp.map(r => {
     const checks = Object.fromEntries(DP.CHECKS.map(c => [c.name, r.checks && r.checks[c.id] ? (r.checks[c.id] === "a" ? c.a : c.b) : ""]));
     return { "เลขที่": docNo(r), "วันที่": isoToDmy(r.date), "สถานะ": stDp(r.status), "ทะเบียนรถ": r.plate || "", "ประเภทรถ": r.truckType || "", "บริษัทขนส่ง": r.transport || "", "ลูกค้าปลายทาง": r.customer || "",
-      "ขอใบ COA": r.coa ? "ขอ" : "", "ปีการผลิต/ฤดู": r.prodYear || "", "เวลาเริ่มขึ้นน้ำตาล": r.timeStart || "", "เวลาขึ้นเสร็จ": r.timeEnd || "", "ชนิดน้ำตาล": r.sugarType || "", "ขนาดบรรจุ": r.pack || "", "คลัง": r.bay || "",
+      "ขอใบ COA": r.coa ? "ขอ" : "", "ปีการผลิต/ฤดู": fmtSeason(r.prodYear), "เวลาเริ่มขึ้นน้ำตาล": r.timeStart || "", "เวลาขึ้นเสร็จ": r.timeEnd || "", "ชนิดน้ำตาล": r.sugarType || "", "ขนาดบรรจุ": r.pack || "", "คลัง": r.bay || "",
       "Lot": (r.lots || []).map(l => l.no).filter(Boolean).join(", "), "จำนวนกระสอบ": dpBags(r), "ตัน": +r.tons || dpTons(r) || 0,
       ...checks, "รายการที่ไม่ผ่าน": dpFails(r).map(c => c.name).join(" / "), "ผ้าใบ / Seal": r.tarp || "", "Seal No.": r.seal || "", "หมายเหตุ": r.note || "", "หมายเหตุอื่น": r.otherNote || "",
       "พนักงานขับรถ": r.driverName || "", "หัวหน้ากะโลจิสติกส์": r.logisticsName || "", "ผู้บันทึก": (r.recordedBy && r.recordedBy.name) || "", "ผู้ตรวจสอบ (QA)": (r.checkedBy && r.checkedBy.name) || "", "ผู้อนุมัติ": (r.approvedBy && r.approvedBy.name) || "",
