@@ -547,6 +547,17 @@ body.phone-mode > #app { display: none; }
 .cust .nm { font-size: 14px; font-weight: 500; line-height: 1.25; }
 .cust .pd { font-size: 12px; color: var(--ink-2); }
 .cust .why { font-size: 12px; color: var(--bad); }
+.cust.sel { border-color: var(--accent, #1e90ff); box-shadow: 0 0 0 3px rgba(30,144,255,.18); }
+.cust-banner { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px 18px; padding: 12px 16px; margin-bottom: 14px; border-radius: 16px; background: #eaf5ff; border: 1.5px solid #bfe0ff; }
+.cust-banner .cb-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.cust-banner .cb-lbl { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.cust-banner .cb-main b { font-size: 16px; }
+.cust-banner .cb-prod { font-size: 12.5px; color: var(--ink-2); flex-basis: 100%; }
+.cust-banner .cb-stat { display: flex; align-items: baseline; gap: 8px; }
+.cust-banner .cb-stat b { font-size: 26px; color: #1677d8; font-variant-numeric: tabular-nums; }
+.cust-banner .cb-stat span { font-size: 12.5px; color: var(--ink-2); max-width: 240px; }
+.cust-banner .cb-x { width: 30px; height: 30px; border-radius: 50%; border: 0; background: #fff; font-size: 18px; line-height: 1; cursor: pointer; color: var(--ink-2); }
+@media (max-width: 860px) { .cust-banner { grid-template-columns: 1fr auto; } .cust-banner .cb-stat { grid-column: 1 / -1; grid-row: 2; } }
 .cust-toggle { margin-top: 10px; border: 0; background: transparent; color: var(--sky-deep); font-size: 13.5px; font-weight: 500; padding: 4px 0; cursor: pointer; }
 .cust-toggle:hover { text-decoration: underline; }
 /* ---------- 5a2. find-lot tabs + dashboard ---------- */
@@ -1473,6 +1484,10 @@ views["find-lot"] = {
         </form>
       </div>
       <div class="fl-block">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="m15.5 11.5 2 2 4-4"/></svg> ลูกค้า <span class="u">แสดงเฉพาะ Lot ที่ผ่านเกณฑ์</span></h2>
+        <select class="select" id="fCust"><option value="">— ทุกลูกค้า —</option></select>
+      </div>
+      <div class="fl-block">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none"/></svg> ช่วงค่าสี <span class="u">ICUMSA (IU)</span></h2>
         <div class="range"><input id="cMin" type="number" inputmode="numeric" placeholder="ต่ำสุด"><span class="dash">–</span><input id="cMax" type="number" inputmode="numeric" placeholder="สูงสุด"></div>
       </div>
@@ -1482,7 +1497,6 @@ views["find-lot"] = {
       </div>
       <div class="fl-block"><h2>เกรด</h2>${chips("fGrade", [["", "ทั้งหมด"], ["DCR", "DCR"], ["VHP", "VHP"], ["Organic", "Organic"]])}</div>
       <div class="fl-block"><h2>สถานะ Spec</h2>${chips("fStatus", [["", "ทั้งหมด"], ["ผ่าน", "ผ่าน"], ["เฝ้าระวัง", "เฝ้าระวัง"], ["ไม่ผ่าน", "ไม่ผ่าน"]])}</div>
-      <div class="fl-block"><h2>ผ่านสเปคลูกค้า</h2><select class="select" id="fCust"><option value="">ทั้งหมด</option></select></div>
       <div class="fl-actions"><button class="btn ghost sm" id="clear" type="button">ล้างตัวกรอง</button></div>
       <div class="fl-status busy" id="dataStatus"><span class="dot"></span><span id="dataText">กำลังโหลดข้อมูลจาก Google Sheets…</span>
         <button class="icon-btn" id="reload" aria-label="โหลดข้อมูลใหม่" title="โหลดข้อมูลใหม่" style="width:32px;height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
@@ -1512,13 +1526,25 @@ views["find-lot"] = {
     }
     function filtered() {
       if (!Q.rows) return [];
-      const f = filters(); const spec = f.cust ? Q.specs.find(s => s.code === f.cust) : null;
+      const f = filters(); const cs = custSpecs(f.cust);
       return Q.rows.filter(r =>
         (!f.s || r.strike.includes(f.s)) && (!f.g || r.grade === f.g) && (!f.st || r.status === f.st) &&
         (f.cMin === null || (r.color !== null && r.color >= f.cMin)) && (f.cMax === null || (r.color !== null && r.color <= f.cMax)) &&
         (f.mMin === null || (r.ma !== null && r.ma >= f.mMin)) && (f.mMax === null || (r.ma !== null && r.ma <= f.mMax)) &&
-        (!spec || (r.grade === spec.grade && checkSpec(r, spec).ok)))
+        (!cs || custPasses(r, cs)))
         .sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
+    }
+    // one customer may have several spec rows (one per product/grade); a lot passes when it meets any spec of its own grade
+    const custSpecs = name => name ? (Q.specs || []).filter(s => s.name === name) : null;
+    const custPasses = (r, cs) => cs.some(s => s.grade === r.grade && checkSpec(r, s).ok);
+    function custBanner(list) {
+      const name = $("#fCust").value; const cs = custSpecs(name); if (!cs || !cs.length) return "";
+      const grades = [...new Set(cs.map(s => s.grade).filter(Boolean))];
+      const base = Q.rows.filter(r => grades.includes(r.grade));
+      const passAll = base.filter(r => custPasses(r, cs)).length;
+      return `<div class="cust-banner"><div class="cb-main"><span class="cb-lbl">ลูกค้า</span><b>${esc(custLabel(cs[0]))}</b><span class="cb-prod">${cs.map(s => esc(s.product || s.grade)).join(" · ")}</span></div>
+        <div class="cb-stat"><b>${fmtInt(list.length)}</b><span>Lot ผ่านเกณฑ์${list.length !== passAll ? ` (ตามตัวกรอง) · ทั้งหมด ${fmtInt(passAll)}` : ""} จาก ${fmtInt(base.length)} Lot เกรด ${esc(grades.join("/") || "—")}</span></div>
+        <button type="button" class="cb-x" id="custClear" aria-label="ล้างลูกค้า" title="ล้างลูกค้า">×</button></div>`;
     }
     const pill = s => `<span class="pill ${QSTATUS[s] || "wait"}">${esc(s || "—")}</span>`;
     const dd = (v, unit) => v === "" || v === null || v === undefined || v === "—" ? `<dd class="dim">—</dd>` : `<dd>${esc(v)}${unit ? `<small>${unit}</small>` : ""}</dd>`;
@@ -1531,18 +1557,19 @@ views["find-lot"] = {
       const res = specsFor(r), pass = res.filter(x => x.ok), fail = res.filter(x => !x.ok);
       if (!res.length) return `<div class="d-group d-cust"><h3>ผ่านสเปคลูกค้า</h3><p class="muted" style="font-size:13.5px">ไม่มีสเปคลูกค้าสำหรับเกรด ${esc(r.grade)} ใน sheet Spec</p></div>`;
       return `<div class="d-group d-cust"><h3>ผ่านสเปคลูกค้า <span class="cnt">${pass.length}/${res.length} ราย</span></h3>
-        ${pass.length ? `<div class="cust-list">${pass.map(x => `<div class="cust ok"><span class="tick">${ICON.tick}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span></div>`).join("")}</div>`
+        ${pass.length ? `<div class="cust-list">${pass.map(x => `<div class="cust ok ${x.spec.name === $("#fCust").value ? "sel" : ""}"><span class="tick">${ICON.tick}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span></div>`).join("")}</div>`
                       : `<p class="muted" style="font-size:13.5px">Lot นี้ยังไม่ผ่านสเปคของลูกค้ารายใดในเกรด ${esc(r.grade)}</p>`}
         ${fail.length ? `<button type="button" class="cust-toggle" id="toggleFails">${showFails ? "ซ่อน" : "ดู"}ลูกค้าที่ไม่ผ่าน (${fail.length} ราย)</button>
-          <div class="cust-list ${showFails ? "" : "hide"}">${fail.map(x => `<div class="cust no"><span class="tick">${ICON.cross}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span><span class="why">${esc(x.fails.join(" · "))}</span></div>`).join("")}</div>` : ""}
+          <div class="cust-list ${showFails ? "" : "hide"}">${fail.map(x => `<div class="cust no ${x.spec.name === $("#fCust").value ? "sel" : ""}"><span class="tick">${ICON.cross}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span><span class="why">${esc(x.fails.join(" · "))}</span></div>`).join("")}</div>` : ""}
       </div>`;
     }
     function renderDetail(list) {
       const el = $("#detail");
       if (!Q.rows) { el.innerHTML = Q.error ? empty("โหลดข้อมูลไม่ได้", Q.error, true) : empty("กำลังโหลดข้อมูลจาก Google Sheets…"); $("#retry")?.addEventListener("click", () => load(true)); return; }
       const r = list.find(x => x.strike === selected);
-      if (!r) { el.innerHTML = empty("ไม่พบ Lot ที่ตรงกับเงื่อนไข", "ลองขยายช่วงค่าหรือล้างตัวกรอง"); return; }
-      const strip = `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
+      const banner = custBanner(list);
+      if (!r) { el.innerHTML = banner + empty(banner ? "ไม่มี Lot ที่ผ่านเกณฑ์ของลูกค้ารายนี้" : "ไม่พบ Lot ที่ตรงกับเงื่อนไข", banner ? "ลองล้างตัวกรองอื่น หรือเลือกลูกค้ารายอื่น" : "ลองขยายช่วงค่าหรือล้างตัวกรอง"); $("#custClear")?.addEventListener("click", clearCust); return; }
+      const strip = banner + `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
         `<button type="button" class="chip ${x.strike === selected ? "on" : ""} ${QSTATUS[x.status] === "hold" ? "hold" : ""}" data-s="${esc(x.strike)}">${esc(x.strike)}</button>`).join("")}${list.length > MAX_CHIPS ? `<span class="more">…และอีก ${fmtInt(list.length - MAX_CHIPS)} รายการ ค้นหาให้แคบลง</span>` : ""}</div></div>`;
       el.innerHTML = strip + `
         <div class="d-head"><div><small>Strike</small><h2>${esc(r.strike)}</h2></div>${pill(r.status)}</div>
@@ -1566,7 +1593,9 @@ views["find-lot"] = {
         ${customersBlock(r)}`;
       el.querySelector(".d-results .chip.on")?.scrollIntoView({ block: "nearest", inline: "center" });
       $("#toggleFails")?.addEventListener("click", () => { showFails = !showFails; renderDetail(list); });
+      $("#custClear")?.addEventListener("click", clearCust);
     }
+    function clearCust() { $("#fCust").value = ""; render(); }
     function render() {
       const list = filtered();
       if (list.length && !list.some(r => r.strike === selected)) selected = list[0].strike;
@@ -1575,8 +1604,10 @@ views["find-lot"] = {
     function fillCustomers() {
       const sel = $("#fCust"); const cur = sel.value;
       const cap = window.innerWidth <= 860 ? 26 : 70; const shortTxt = t => t.length > cap ? t.slice(0, cap - 1) + "…" : t; // ย่อชื่อยาวบนมือถือ/แท็บเล็ตไม่ให้ล้นจอ
-      sel.innerHTML = `<option value="">ทั้งหมด</option>` + (Q.specs || []).map(s => `<option value="${esc(s.code)}" title="${esc(custLabel(s))} · ${esc(s.product)}">${esc(shortTxt(custLabel(s) + " · " + s.product))}</option>`).join("");
-      sel.value = cur;
+      const byName = new Map(); (Q.specs || []).forEach(s => { if (!byName.has(s.name)) byName.set(s.name, []); byName.get(s.name).push(s); });
+      const names = [...byName.keys()].sort((a, b) => a.localeCompare(b));
+      sel.innerHTML = `<option value="">— ทุกลูกค้า —</option>` + names.map(n => { const cs = byName.get(n); const g = [...new Set(cs.map(s => s.grade).filter(Boolean))].join("/"); return `<option value="${esc(n)}" title="${esc(custLabel(cs[0]))} · ${esc(cs.map(s => s.product).join(", "))}">${esc(shortTxt(custLabel(cs[0]) + (g ? " · " + g : "")))}</option>`; }).join("");
+      sel.value = names.includes(cur) ? cur : "";
     }
     function status() {
       const el = $("#dataStatus"), t = $("#dataText");
