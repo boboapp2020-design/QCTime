@@ -103,6 +103,11 @@ h1, h2, h3, p { margin: 0; }
 .landing .brand svg { width: 1.35em; height: 1.35em; flex: none; }
 .landing .top-actions .user-chip { height: clamp(38px, 4.4vw, 52px); padding: 4px 16px 4px 5px; border-radius: 999px; background: rgba(255,255,255,.86); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 4px 16px rgba(0,50,100,.2); color: var(--ink); font-size: clamp(13px, 1.3vw, 16px); font-weight: 500; max-width: 46vw; }
 .install-btn { display: inline-flex; align-items: center; gap: 6px; height: clamp(38px, 4.4vw, 52px); padding: 0 16px; border: 0; border-radius: 999px; background: var(--sky, #1e90ff); color: #fff; font: inherit; font-size: clamp(13px, 1.3vw, 16px); font-weight: 500; cursor: pointer; box-shadow: 0 4px 12px rgba(0,60,140,.25); white-space: nowrap; }
+.ih .modal-head h2 { display: flex; align-items: center; gap: 10px; } .ih-app { width: 36px; height: 36px; border-radius: 9px; }
+.ih-note { font-size: 13.5px; color: var(--ink-2); background: var(--paper-2); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; }
+.ih-steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 15px; line-height: 1.5; } .ih-steps li::marker { font-weight: 700; color: var(--sky-deep, #1677d8); }
+.ih-ico { width: 20px; height: 20px; vertical-align: -4px; color: var(--sky-deep, #1677d8); } .ih-key { display: inline-block; min-width: 22px; text-align: center; border-radius: 6px; background: var(--paper-2); }
+.ih-link { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 10px; border-radius: 12px; border: 1.5px dashed var(--line); font-size: 13px; } .ih-link span { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--ink-2); user-select: all; }
 .install-btn svg { width: 18px; height: 18px; } .install-btn:hover { filter: brightness(1.06); } .install-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 @media (max-width: 640px) { .install-btn span { display: none; } .install-btn { padding: 0; width: clamp(38px, 4.4vw, 52px); justify-content: center; } }
 .landing .top-actions .user-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1309,22 +1314,54 @@ function renderPhone() {
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-phone]"); if (!b) return; localStorage.setItem("qc.phone", "1"); renderPhone(); });
 if (IN_FRAME) document.documentElement.classList.add("in-frame");
-/* ---------- ติดตั้งเป็นแอป (PWA) ---------- */
+/* ---------- ติดตั้งเป็นแอป (PWA) · Android + iOS (มือถือและแท็บเล็ต) ---------- */
 // service worker: ทำให้ Android/คอมพิวเตอร์ติดตั้งได้ และเปิดหน้าแอปได้แม้เน็ตไม่ดี (ข้อมูล /api ไม่ถูกเก็บ)
 if ("serviceWorker" in navigator && !IN_FRAME && location.protocol === "https:") addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 let installEvt = null;
+const UA = navigator.userAgent;
 const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-const canInstall = () => !IN_FRAME && !isStandalone() && (!!installEvt || isIOS());
+const isIOS = () => /iphone|ipad|ipod/i.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPad รุ่นใหม่รายงานตัวเองเป็น Mac
+const isAndroid = () => /android/i.test(UA);
+const inAppBrowser = () => /\bLine\/|FBAN|FBAV|FB_IAB|Instagram|Messenger|MicroMessenger/i.test(UA); // เบราว์เซอร์ในแอป LINE / Facebook ติดตั้งไม่ได้
+const canInstall = () => !IN_FRAME && !isStandalone() && (!!installEvt || isIOS() || isAndroid());
 const syncInstallBtns = () => document.querySelectorAll("[data-install]").forEach(b => b.hidden = !canInstall());
 const installBtnHtml = () => `<button type="button" class="install-btn" data-install ${canInstall() ? "" : "hidden"} title="ติดตั้ง QC Time ลงในเครื่องนี้"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span>ติดตั้งแอป</span></button>`;
 addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; syncInstallBtns(); });
-addEventListener("appinstalled", () => { installEvt = null; syncInstallBtns(); toast("<b>ติดตั้งแอปแล้ว</b> เปิดจากไอคอน QC Time บนหน้าจอได้เลย", 3500); });
+addEventListener("appinstalled", () => { installEvt = null; syncInstallBtns(); closeInstallHelp(); toast("<b>ติดตั้งแอปแล้ว</b> เปิดจากไอคอน QC Time บนหน้าจอได้เลย", 3500); });
+// วิธีติดตั้งตามเครื่อง/เบราว์เซอร์ที่ใช้อยู่
+function installSteps() {
+  const ICO_SHARE = `<svg class="ih-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="ปุ่มแชร์"><path d="M12 3v12"/><path d="m8 7 4-4 4 4"/><path d="M6 11v9h12v-9"/></svg>`;
+  const ICO_MENU = `<b class="ih-key" aria-label="เมนู">⋮</b>`;
+  if (inAppBrowser()) return { title: "เปิดในเบราว์เซอร์ก่อน", note: "หน้านี้เปิดอยู่ในแอป LINE / Facebook ซึ่งติดตั้งแอปไม่ได้", steps: isIOS()
+    ? [`แตะเมนู ${ICO_MENU} หรือปุ่มแชร์ ${ICO_SHARE} ของหน้านี้`, `เลือก <b>“เปิดใน Safari”</b> (หรือ “เปิดในเบราว์เซอร์”)`, `แล้วกดปุ่ม <b>ติดตั้งแอป</b> อีกครั้งใน Safari`]
+    : [`แตะเมนู ${ICO_MENU} ของหน้านี้`, `เลือก <b>“เปิดในเบราว์เซอร์อื่น”</b> หรือ “เปิดใน Chrome”`, `แล้วกดปุ่ม <b>ติดตั้งแอป</b> อีกครั้งใน Chrome`] };
+  if (isIOS()) {
+    const ipad = /ipad/i.test(UA) || navigator.platform === "MacIntel", other = /CriOS|EdgiOS|FxiOS/i.test(UA);
+    return { title: ipad ? "ติดตั้งบน iPad" : "ติดตั้งบน iPhone", note: other ? "ใช้ได้กับ iOS 16.4 ขึ้นไป ถ้าไม่มีเมนูนี้ ให้เปิดลิงก์นี้ใน Safari" : "",
+      steps: [other ? `แตะปุ่มแชร์ ${ICO_SHARE} ในแถบที่อยู่ด้านบน` : `แตะปุ่มแชร์ ${ICO_SHARE} ${ipad ? "มุมขวาบน" : "แถบด้านล่าง"}`, `เลื่อนลง แล้วแตะ <b>“เพิ่มไปยังหน้าจอโฮม”</b>`, `แตะ <b>“เพิ่ม”</b> มุมขวาบน · ไอคอน QC Time จะอยู่บนหน้าจอโฮม`] };
+  }
+  if (/SamsungBrowser/i.test(UA)) return { title: "ติดตั้งบน Samsung Internet", note: "", steps: [`แตะเมนู <b class="ih-key">≡</b> แถบด้านล่าง`, `แตะ <b>“เพิ่มหน้าไปยัง”</b> แล้วเลือก <b>“หน้าจอหลัก”</b>`, `แตะ <b>“เพิ่ม”</b> · ไอคอน QC Time จะอยู่บนหน้าจอหลัก`] };
+  return { title: "ติดตั้งบน Android", note: "", steps: [`แตะเมนู ${ICO_MENU} มุมขวาบนของ Chrome`, `แตะ <b>“ติดตั้งแอป”</b> หรือ <b>“เพิ่มลงในหน้าจอหลัก”</b>`, `แตะ <b>“ติดตั้ง”</b> · ไอคอน QC Time จะอยู่บนหน้าจอหลัก`] };
+}
+function closeInstallHelp() { document.getElementById("installHelp")?.remove(); }
+function showInstallHelp() {
+  closeInstallHelp(); const s = installSteps();
+  const m = document.createElement("div"); m.id = "installHelp"; m.className = "modal ih";
+  m.innerHTML = `<div class="modal-box sm" role="dialog" aria-modal="true" aria-labelledby="ihTitle"><div class="modal-head"><h2 id="ihTitle"><img src="assets/icon-192.png" alt="" class="ih-app">${s.title}</h2></div>
+    ${s.note ? `<p class="ih-note">${s.note}</p>` : ""}<ol class="ih-steps">${s.steps.map(x => `<li>${x}</li>`).join("")}</ol>
+    <div class="ih-link"><span>${esc(location.origin + location.pathname)}</span><button type="button" class="btn sm ghost" id="ihCopy">คัดลอกลิงก์</button></div>
+    <div class="modal-foot"><span class="muted"></span><button type="button" class="btn" id="ihClose">เข้าใจแล้ว</button></div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m || e.target.id === "ihClose") closeInstallHelp(); });
+  m.querySelector("#ihCopy").addEventListener("click", () => { const t = location.origin + location.pathname; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast("คัดลอกลิงก์แล้ว")).catch(() => { const r = document.createRange(); r.selectNodeContents(m.querySelector(".ih-link span")); getSelection().removeAllRanges(); getSelection().addRange(r); }); });
+  m.querySelector("#ihClose").focus();
+}
 document.addEventListener("click", async e => {
   if (!e.target.closest("[data-install]")) return;
-  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); if (r && r.outcome === "accepted") installEvt = null; syncInstallBtns(); return; }
-  if (isIOS()) toast("<b>ติดตั้งบน iPhone / iPad</b><br>1. เปิดหน้านี้ใน Safari<br>2. แตะปุ่มแชร์ (สี่เหลี่ยมมีลูกศรชี้ขึ้น)<br>3. เลือก “เพิ่มไปยังหน้าจอโฮม” แล้วแตะ “เพิ่ม”", 9000);
+  if (installEvt && !inAppBrowser()) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); if (r && r.outcome === "accepted") installEvt = null; syncInstallBtns(); return; }
+  showInstallHelp(); // iOS ทุกเบราว์เซอร์ / Android ที่เบราว์เซอร์ยังไม่เสนอปุ่มติดตั้งเอง / เบราว์เซอร์ในแอป
 });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeInstallHelp(); });
 const views = {};
 /* ---------- per-role page access (deny-list: role → pages they may NOT open) ---------- */
 const PAGE_DENY = { "คลังสินค้า": ["release", "coa"], "QC": ["coa"], "ฝ่ายขาย": ["release"], "แพ็ค": ["find-lot", "release", "coa"] };
