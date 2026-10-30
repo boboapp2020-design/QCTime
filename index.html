@@ -433,12 +433,14 @@ h1, h2, h3, p { margin: 0; }
 .gear.phone { color: var(--mango-deep); }
 html.in-frame [data-phone] { display: none !important; }
 body.phone-mode > #app { display: none; }
-#phoneWrap { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 14px; background: rgba(10,30,60,.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+#phoneWrap { position: fixed; inset: 0; z-index: 50; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 14px; background: rgba(10,30,60,.55); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
 .phone-bar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: center; padding: 8px 14px; border-radius: 999px; background: rgba(255,255,255,.94); box-shadow: 0 8px 24px rgba(0,30,70,.25); font-size: 14px; }
 .phone-bar b { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; }
 .phone-bar b svg { width: 18px; height: 18px; }
 .phone-bar .chip { padding: 5px 10px; font-size: 12.5px; }
 .phone-frame.tablet { border-radius: 30px; padding: 16px; } .phone-frame.tablet .phone-notch { display: none; } .phone-frame.tablet iframe { border-radius: 16px; }
+.phone-stage { flex: none; position: relative; }
+.phone-stage > .phone-frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 .phone-frame { position: relative; flex: none; border-radius: 46px; background: #0f1a2a; padding: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.45), inset 0 0 0 2px #3a4a60; }
 .phone-notch { position: absolute; left: 50%; top: 13px; transform: translateX(-50%); width: 96px; height: 20px; border-radius: 999px; background: #0f1a2a; z-index: 2; }
 .phone-frame iframe { width: 100%; height: 100%; border: 0; border-radius: 36px; background: #fff; display: block; }
@@ -685,6 +687,10 @@ body.phone-mode > #app { display: none; }
 .dp-card:hover { border-color: #b9d7c0; }
 .dp-card.on { border-color: var(--leaf); background: var(--leaf-soft); box-shadow: inset 4px 0 0 var(--leaf); }
 .dp-card.task { border-left: 4px solid var(--mango); }
+.combo-pop { position: fixed; z-index: 9999; margin: 0; padding: 6px; list-style: none; overflow-y: auto; background: #fff; border: 1.5px solid var(--line); border-radius: 14px; box-shadow: 0 12px 32px rgba(15,40,70,.18); }
+.combo-pop li { padding: 9px 12px; border-radius: 10px; font-size: 14.5px; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; cursor: pointer; color: var(--ink, #1b2a3a); }
+.combo-pop li small { display: block; font-size: 12px; color: var(--ink-3); }
+.combo-pop li:hover, .combo-pop li.on { background: var(--paper-2, #eef4fa); }
 .draft-wrap { display: flex; gap: 6px; align-items: stretch; }
 .draft-wrap .draftcard { flex: 1; min-width: 0; }
 .draft-del { flex: none; border: 1.5px solid #f3c5c7; background: #fff; color: var(--bad, #e5484d); border-radius: 14px; padding: 0 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -1107,6 +1113,44 @@ const fmtInt = n => Number(n).toLocaleString("th-TH");
 const fmtDate = v => { if (!v) return "—"; const [y, m, d] = v.split("-"); return `${d}/${m}/${y}`; };
 const productEn = t => PRODUCT_EN[t] || t;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// combobox: input[data-combo="<datalistId>"] → styled suggestion list that wraps long names (Chrome's native datalist popup truncates them)
+(() => {
+  let box = null, inp = null, idx = -1, picking = false;
+  const close = () => { box?.remove(); box = null; inp = null; idx = -1; };
+  const lis = () => box ? [...box.querySelectorAll("li")] : [];
+  const mark = () => lis().forEach((li, i) => { li.classList.toggle("on", i === idx); if (i === idx) li.scrollIntoView({ block: "nearest" }); });
+  const pick = v => { const el = inp; close(); picking = true; el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); picking = false; };
+  function place() {
+    if (!box || !inp) return; const r = inp.getBoundingClientRect();
+    const w = Math.min(Math.max(r.width, 320), innerWidth - 16); box.style.width = w + "px"; box.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+    const below = innerHeight - r.bottom - 12, up = below < 200 && r.top > below;
+    box.style.maxHeight = Math.max(140, Math.min(340, up ? r.top - 16 : below)) + "px";
+    box.style.top = up ? "" : (r.bottom + 4) + "px"; box.style.bottom = up ? (innerHeight - r.top + 4) + "px" : "";
+  }
+  function open(el) {
+    const dl = document.getElementById(el.dataset.combo); if (!dl) return;
+    const q = el.value.trim().toLowerCase();
+    const opts = [...dl.options].map(o => ({ v: o.value, l: o.textContent.trim() !== o.value ? o.textContent.trim() : "" })).filter(o => o.v && (!q || o.v.toLowerCase().includes(q) || o.l.toLowerCase().includes(q)));
+    if (!opts.length || (opts.length === 1 && opts[0].v === el.value)) { close(); return; }
+    if (!box) { box = document.createElement("ul"); box.className = "combo-pop"; box.setAttribute("role", "listbox"); document.body.appendChild(box); box.addEventListener("mousedown", e => { const li = e.target.closest("li"); e.preventDefault(); if (li) pick(li.dataset.v); }); }
+    inp = el; idx = -1;
+    box.innerHTML = opts.slice(0, 300).map(o => `<li role="option" data-v="${esc(o.v)}">${esc(o.v)}${o.l ? `<small>${esc(o.l)}</small>` : ""}</li>`).join("");
+    place();
+  }
+  document.addEventListener("focusin", e => { const el = e.target.closest?.("input[data-combo]"); if (el) open(el); });
+  document.addEventListener("click", e => { const el = e.target.closest?.("input[data-combo]"); if (el && !box) open(el); });
+  document.addEventListener("input", e => { const el = e.target.closest?.("input[data-combo]"); if (el && !picking) open(el); });
+  document.addEventListener("focusout", e => { if (e.target === inp) setTimeout(() => { if (document.activeElement !== inp) close(); }, 120); });
+  document.addEventListener("keydown", e => {
+    if (!box || e.target !== inp) return; const n = lis().length;
+    if (e.key === "ArrowDown") { e.preventDefault(); idx = (idx + 1) % n; mark(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); idx = (idx - 1 + n) % n; mark(); }
+    else if (e.key === "Enter" && idx >= 0) { e.preventDefault(); pick(lis()[idx].dataset.v); }
+    else if (e.key === "Escape") close();
+  });
+  addEventListener("resize", place); document.addEventListener("scroll", e => { if (box && !box.contains(e.target)) place(); }, true);
+  addEventListener("hashchange", close);
+})();
 const lotByNo = no => LOTS.find(l => l.no === no);
 const getUser = () => JSON.parse(localStorage.getItem("qc.user") || "null") || { name: "สุรศักดิ์", role: "QC" };
 // Prototype accounts — replace with the Users sheet via Apps Script when connected
@@ -1235,16 +1279,25 @@ const app = document.getElementById("app");
 /* ---------- phone view (preview the mobile layout on a desktop screen) ---------- */
 const IN_FRAME = window.self !== window.top;
 const PHONE_SIZES = [["390", "844", "iPhone 14/15"], ["430", "932", "iPhone Pro Max"], ["360", "800", "Android"], ["768", "1024", "iPad mini"], ["820", "1180", "iPad Air"], ["1024", "768", "iPad นอน"]];
+// ย่อกรอบมือถือ/แท็บเล็ตให้พอดีพื้นที่ใต้แถบเลือกขนาด (ขนาดจอจริงภายใน iframe คงเดิม)
+function fitPhone() {
+  const st = document.querySelector("#phoneWrap .phone-stage"), fr = st?.querySelector(".phone-frame"); if (!fr) return;
+  const fw = fr.offsetWidth, fh = fr.offsetHeight, r = st.getBoundingClientRect();
+  const s = Math.min(1, (window.innerWidth - 28) / fw, (window.innerHeight - r.top - 14) / fh);
+  fr.style.transform = `scale(${s})`; st.style.width = fw * s + "px"; st.style.height = fh * s + "px";
+}
+addEventListener("resize", () => { if (!IN_FRAME) fitPhone(); });
 function phoneOn() { return !IN_FRAME && localStorage.getItem("qc.phone") === "1"; }
 function renderPhone() {
   document.getElementById("phoneWrap")?.remove(); document.body.classList.toggle("phone-mode", phoneOn()); if (!phoneOn()) return;
   const [w, hgt] = (localStorage.getItem("qc.phone.size") || "390x844").split("x");
   const wrap = document.createElement("div"); wrap.id = "phoneWrap";
   wrap.innerHTML = `<div class="phone-bar"><b>${ICON.phone} มุมมองมือถือ / แท็บเล็ต</b><div class="chips">${PHONE_SIZES.map(s => `<button type="button" class="chip ${s[0] === w ? "on" : ""}" data-size="${s[0]}x${s[1]}">${s[2]} · ${s[0]}×${s[1]}</button>`).join("")}</div><button type="button" class="btn sm ghost" id="phoneExit">ปิดมุมมองมือถือ</button></div>
-    <div class="phone-frame" style="width:${+w + 24}px;height:min(${+hgt + 24}px, calc(100vh - 92px))"><div class="phone-notch"></div><iframe title="QC Time บนมือถือ" src="${location.pathname}${location.search}${location.hash}"></iframe></div>`;
+    <div class="phone-stage"><div class="phone-frame" style="width:${+w + 24}px;height:${+hgt + 24}px"><div class="phone-notch"></div><iframe title="QC Time บนมือถือ" src="${location.pathname}${location.search}${location.hash}"></iframe></div></div>`;
   document.body.appendChild(wrap);
   wrap.querySelector("#phoneExit").addEventListener("click", () => { localStorage.removeItem("qc.phone"); const f = wrap.querySelector("iframe"); try { if (f.contentWindow.location.hash) location.hash = f.contentWindow.location.hash; } catch (e) {} renderPhone(); route(); });
   wrap.querySelector(".phone-frame").classList.toggle("tablet", +w >= 700);
+  fitPhone();
   wrap.querySelectorAll("[data-size]").forEach(b => b.addEventListener("click", () => { localStorage.setItem("qc.phone.size", b.dataset.size); renderPhone(); }));
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-phone]"); if (!b) return; localStorage.setItem("qc.phone", "1"); renderPhone(); });
@@ -2224,7 +2277,7 @@ views.release = {
         <h3 class="dp-h">วันที่และเวลา</h3>
         <div class="fgrid">${field("วันที่", `<input class="input" id="w_date" type="date" value="${esc(d.date)}">`, true)}${field("ปีการผลิต / ฤดู", `<input class="input" id="w_prodYear" value="${esc(d.prodYear || currentSeason())}" placeholder="เช่น 25 26">`)}${field("เวลาเริ่มขึ้นน้ำตาล", `<input class="input" id="w_timeStart" type="time" value="${esc(d.timeStart)}">`, true)}</div>
         <h3 class="dp-h">รถและผู้เกี่ยวข้อง</h3>
-        <div class="fgrid">${field("ทะเบียนรถ", `<input class="input" id="w_plate" value="${esc(d.plate)}" placeholder="เช่น ກຂ 1234">`, true)}${field("บริษัทขนส่ง (ไม่บังคับ)", `<input class="input" id="w_transport" value="${esc(d.transport)}" placeholder="ชื่อบริษัทขนส่ง">`)}${field("ลูกค้าปลายทาง", `<input class="input" id="w_customer" list="dpCust" value="${esc(d.customer)}" placeholder="ชื่อลูกค้า / ปลายทาง"><datalist id="dpCust">${[...new Set((Q.specs || []).map(s => s.name))].map(c => `<option value="${esc(c)}">`).join("")}</datalist>`, true)}</div>
+        <div class="fgrid">${field("ทะเบียนรถ", `<input class="input" id="w_plate" value="${esc(d.plate)}" placeholder="เช่น ກຂ 1234">`, true)}${field("บริษัทขนส่ง (ไม่บังคับ)", `<input class="input" id="w_transport" value="${esc(d.transport)}" placeholder="ชื่อบริษัทขนส่ง">`)}${field("ลูกค้าปลายทาง", `<input class="input" id="w_customer" data-combo="dpCust" autocomplete="off" value="${esc(d.customer)}" placeholder="ชื่อลูกค้า / ปลายทาง"><datalist id="dpCust">${[...new Set((Q.specs || []).map(s => s.name))].map(c => `<option value="${esc(c)}">`).join("")}</datalist>`, true)}</div>
         <h3 class="dp-h">ประเภทรถบรรทุก <span class="req"></span></h3>${chipsOf("w_truck", DP.TRUCK, d.truckType)}
         <div class="switch-row" style="margin-top:14px"><div><div class="lbl">ขอใบ COA</div><div class="sub">Certificate of Analysis แนบไปกับสินค้า</div></div><button class="switch" id="w_coa" aria-checked="${!!d.coa}"></button></div>`;
       if (step === 1) inner = `
@@ -2625,8 +2678,8 @@ views.coa = {
           ${f("e_reqNo", "COA Request No. (ฝกต.)", `<input class="input" id="e_reqNo" value="${esc(cur.reqNo)}" data-f="reqNo" placeholder="เลขที่คำขอจากฝ่ายการตลาด" ${dis}>`)}
           ${f("e_truckIn", `Truck No. <small class="muted">(${coaTrucksOf(cur).length}/${COA_MAX_TRUCKS} คัน · เลือกจากบันทึกจ่ายออก)</small>`, `${p1open && coaTrucksOf(cur).length < COA_MAX_TRUCKS ? `<div class="coa-lotadd"><input class="input" id="e_truckIn" list="coaTrucks" placeholder="พิมพ์หรือเลือกทะเบียนรถ" autocomplete="off"><datalist id="coaTrucks">${[...new Map(dpRecs().filter(d => d.status !== "draft" && d.plate).sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(d => [d.plate.replace(/\s/g, ""), d])).values()].filter(d => !coaTrucksOf(cur).some(t => t.replace(/\s/g, "") === d.plate.replace(/\s/g, ""))).slice(0, 300).map(d => `<option value="${esc(d.plate)}">${esc(isoToDmy(d.date))} · ${esc(d.customer || "")} · ${esc(d.sugarType || "")}</option>`).join("")}</datalist><button class="btn sm" id="e_truckAdd" type="button">เพิ่ม</button></div>` : ""}
             <div class="coa-trucks">${coaTrucksOf(cur).map((t, i) => { const d = coaDispOf(t); return `<span class="coa-truck ${d ? "" : "nod"}"><i>${String.fromCharCode(97 + i)}</i><b>${esc(t)}</b>${d ? `<small>${esc(isoToDmy(d.date))} · ${fmt(+d.tons || dpTons(d), 3)} ตัน</small>` : `<small>ไม่พบในบันทึกจ่ายออก</small>`}${p1open ? `<button type="button" class="rm" data-trm="${i}" aria-label="ลบ">×</button>` : ""}</span>`; }).join("") || `<span class="muted" style="font-size:12.5px">ยังไม่ได้เลือกรถ · เลือกแล้วระบบดึงลูกค้า เกรด บรรจุ น้ำหนัก และ Lot จากบันทึกจ่ายออกให้</span>`}</div>`)}
-          ${f("e_cust", "Company of Customer Request", `<input class="input" id="e_cust" list="coaCustomers" value="${esc(cur.customer)}" data-f="customer" placeholder="ชื่อบริษัทลูกค้า" autocomplete="off" ${dis}><datalist id="coaCustomers">${[...new Set((Q.specs || []).map(s => s.name))].map(n => `<option value="${esc(n)}">`).join("")}</datalist>`, true)}
-          ${f("e_imp", "Company of Import", `<input class="input" id="e_imp" list="coaCustomers" value="${esc(cur.importer || "")}" data-f="importer" placeholder="บริษัทผู้นำเข้า" autocomplete="off" ${dis}>`)}
+          ${f("e_cust", "Company of Customer Request", `<input class="input" id="e_cust" data-combo="coaCustomers" value="${esc(cur.customer)}" data-f="customer" placeholder="ชื่อบริษัทลูกค้า" autocomplete="off" ${dis}><datalist id="coaCustomers">${[...new Set((Q.specs || []).map(s => s.name))].map(n => `<option value="${esc(n)}">`).join("")}</datalist>`, true)}
+          ${f("e_imp", "Company of Import", `<input class="input" id="e_imp" data-combo="coaCustomers" value="${esc(cur.importer || "")}" data-f="importer" placeholder="บริษัทผู้นำเข้า" autocomplete="off" ${dis}>`)}
           <div class="grid-2">${f("e_grade", "Grade of Sugar", `<select class="select" id="e_grade" data-f="grade" ${dis}><option value="">— เลือก —</option>${COA_GRADES.map(g => `<option ${g === cur.grade ? "selected" : ""}>${g}</option>`).join("")}</select>`, true)}${f("e_lot", "Lot Number", `<input class="input" id="e_lot" list="coaDispLots" value="${esc(cur.lotNumber)}" data-f="lotNumber" placeholder="ดึงจากรถที่เลือก เช่น 259, 262" autocomplete="off" ${dis}><datalist id="coaDispLots">${[...dispSet].slice(0, 500).map(n => { const lo = (Q.rows || []).find(r => r.strike === n); return `<option value="${esc(n)}">${lo ? esc(lo.grade) : "จ่ายออกแล้ว"}</option>`; }).join("")}</datalist>`)}</div>
           <div class="coa-remark"><span class="coa-remark-h">Remark</span>
             <div class="grid-2">${f("e_inv", "Export Invoice NO", `<input class="input" id="e_inv" value="${esc(cur.invoiceNo || "")}" data-f="invoiceNo" ${dis}>`)}${f("e_so", "S/O", `<input class="input" id="e_so" value="${esc(cur.soNo || "")}" data-f="soNo" ${dis}>`)}</div>
