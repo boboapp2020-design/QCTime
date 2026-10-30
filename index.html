@@ -685,6 +685,10 @@ body.phone-mode > #app { display: none; }
 .dp-card:hover { border-color: #b9d7c0; }
 .dp-card.on { border-color: var(--leaf); background: var(--leaf-soft); box-shadow: inset 4px 0 0 var(--leaf); }
 .dp-card.task { border-left: 4px solid var(--mango); }
+.draft-wrap { display: flex; gap: 6px; align-items: stretch; }
+.draft-wrap .draftcard { flex: 1; min-width: 0; }
+.draft-del { flex: none; border: 1.5px solid #f3c5c7; background: #fff; color: var(--bad, #e5484d); border-radius: 14px; padding: 0 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.draft-del:hover, .draft-del:focus-visible { background: #fdecec; }
 .dp-card .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .dp-card .l1 b { font-size: 16px; font-weight: 600; }
 .dp-card .l2 { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
@@ -2049,7 +2053,7 @@ views.release = {
     const $ = s => root.querySelector(s);
     const me = getUser(), role = dpRole(); const myUser = localStorage.getItem("qc.lastUser") || me.name;
     let mode = "empty", cur = null, step = 0, draft = null, editUid = null, filter = "all";
-    const saved = JSON.parse(localStorage.getItem(dpKey.draft) || "null");
+    let saved = JSON.parse(localStorage.getItem(dpKey.draft) || "null");
     let tab = "entry";
     const showTab = t => { tab = t; document.querySelectorAll(".fl-tabs .tab").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }); $("#rTabEntry").classList.toggle("hide", t !== "entry"); $("#rTabStatus").classList.toggle("hide", t !== "status"); $("#rTabDash").classList.toggle("hide", t !== "dash"); };
     document.querySelectorAll(".fl-tabs .tab").forEach(b => b.addEventListener("click", () => { showTab(b.dataset.tab); if (b.dataset.tab === "entry") renderEntry(); else if (b.dataset.tab === "dash") renderDash(); else renderMain(); }));
@@ -2120,6 +2124,8 @@ views.release = {
       $("#dpModalNo").onclick = () => done(null);
     });
     const saveDraftState = () => { if (draft) localStorage.setItem(dpKey.draft, JSON.stringify({ draft, step, editUid })); else localStorage.removeItem(dpKey.draft); };
+    // ลบร่างที่เขียนค้างไว้ (เก็บในเครื่องเท่านั้น ยังไม่ได้ส่งขึ้นชีต)
+    async function deleteSavedDraft() { if (!await ask("ลบร่าง", "ร่างที่ยังเขียนไม่เสร็จนี้จะถูกลบถาวร กู้คืนไม่ได้")) return; localStorage.removeItem(dpKey.draft); saved = null; if (!draft) mode = "empty"; toast("🗑 ลบร่างแล้ว"); renderList(); renderEntry(); }
 
     /* ---- left column ---- */
     function renderList() {
@@ -2141,7 +2147,7 @@ views.release = {
       $("#dpTasks").innerHTML = tasks.length ? `<div class="dp-task-h">งานที่รอคุณดำเนินการ <b>${tasks.length}</b></div>` : "";
       // draft resume
       let html = "";
-      if (saved && saved.draft && (role === "recorder" || role === "admin") && !draft) html += `<button type="button" class="dp-card draftcard" id="dpResume"><b>✎ ร่างที่ยังเขียนไม่เสร็จ</b><span>${esc(saved.draft.plate || "ยังไม่ระบุทะเบียน")} · ขั้นตอน ${saved.step + 1}/4</span></button>`;
+      if (saved && saved.draft && (role === "recorder" || role === "admin") && !draft) html += `<div class="draft-wrap"><button type="button" class="dp-card draftcard" id="dpResume"><b>✎ ร่างที่ยังเขียนไม่เสร็จ</b><span>${esc(saved.draft.plate || "ยังไม่ระบุทะเบียน")} · ขั้นตอน ${saved.step + 1}/4</span></button><button type="button" class="draft-del" id="dpDraftDel" title="ลบร่างนี้">🗑 ลบร่าง</button></div>`;
       let list = recs.filter(r => (filter === "all" || (filter === "returned" ? (r.status === "returned" || r.status === "rejected") : r.status === filter)) && (!q || `${r.plate} ${r.customer} ${r.transport}`.toLowerCase().includes(q)))
         .sort((a, b) => (b.date || "").localeCompare(a.date || "") || (+b.id - +a.id));
       const groups = {}; list.forEach(r => (groups[r.date] = groups[r.date] || []).push(r));
@@ -2153,6 +2159,7 @@ views.release = {
         </button>`).join("")).join("");
       $("#dpCards").innerHTML = html || `<div class="d-empty" style="padding:20px"><img src="assets/mascot.png" alt=""><b>ยังไม่มีบันทึก</b><span>${role === "recorder" ? "กด + บันทึกใหม่ เพื่อเริ่ม" : ""}</span></div>`;
       $("#dpResume")?.addEventListener("click", () => { draft = saved.draft; step = saved.step; editUid = saved.editUid; mode = "wizard"; showTab("entry"); renderEntry(); });
+      $("#dpDraftDel")?.addEventListener("click", deleteSavedDraft);
       const qn = dpQueue().length; $("#dpSync").innerHTML = !apiUrl() ? `<span class="dot off"></span>ยังไม่เชื่อมชีต (ตั้งค่า Web App URL)` : qn ? `<span class="dot wait"></span>รอซิงค์ขึ้นชีต ${qn} รายการ` : `<span class="dot ok"></span>ซิงค์กับ Google Sheets แล้ว`;
     }
 
@@ -2174,11 +2181,12 @@ views.release = {
           ${role === "recorder" || role === "admin"
             ? `<button type="button" class="dp-hero-tile leaf" id="dpStart"><img src="assets/btn-release.png" alt=""><span class="tile-txt"><b>+ เริ่มบันทึกใหม่</b><small>กรอก 4 ขั้นตอน: ข้อมูลทั่วไป · สภาพรถก่อนโหลด · สภาพน้ำตาล · ผ้าใบ/Seal แล้วส่งให้ผู้ตรวจสอบ (QA)</small><i>›</i></span></button>`
             : `<div class="dp-hero-tile leaf nolink"><img src="assets/btn-release.png" alt=""><span class="tile-txt"><b>บันทึกการส่งมอบน้ำตาล</b><small>บทบาท ${esc(me.role)} ใช้แท็บ "รายละเอียดและสถานะ" เพื่อตรวจสอบ / อนุมัติ</small></span></div>`}
-          ${saved && saved.draft && (role === "recorder" || role === "admin") ? `<button type="button" class="dp-card draftcard" id="dpResume2"><b>✎ ร่างที่ยังเขียนไม่เสร็จ</b><span>${esc(saved.draft.plate || "ยังไม่ระบุทะเบียน")} · ขั้นตอน ${saved.step + 1}/4 · กดเพื่อเขียนต่อ</span></button>` : ""}
+          ${saved && saved.draft && (role === "recorder" || role === "admin") ? `<div class="draft-wrap"><button type="button" class="dp-card draftcard" id="dpResume2"><b>✎ ร่างที่ยังเขียนไม่เสร็จ</b><span>${esc(saved.draft.plate || "ยังไม่ระบุทะเบียน")} · ขั้นตอน ${saved.step + 1}/4 · กดเพื่อเขียนต่อ</span></button><button type="button" class="draft-del" id="dpDraftDel2" title="ลบร่างนี้">🗑 ลบร่าง</button></div>` : ""}
           ${mine.length ? `<h3 class="dp-h">บันทึกล่าสุดของคุณ</h3><div class="dp-recent">${mine.map(r => `<button type="button" class="dp-card" data-uid="${r.uid}"><div class="l1"><b>${esc(r.plate)}</b>${pill(r.status)}</div><div class="l2">${isoToDmy(r.date)} · ${esc(r.customer)} · ${fmt(+r.tons || 0, 1)} ตัน</div></button>`).join("")}</div>` : ""}
         </div>`;
         $("#dpStart")?.addEventListener("click", () => $("#dpNew")?.click());
         $("#dpResume2")?.addEventListener("click", () => { draft = saved.draft; step = saved.step; editUid = saved.editUid; mode = "wizard"; renderEntry(); });
+        $("#dpDraftDel2")?.addEventListener("click", deleteSavedDraft);
         el.querySelectorAll(".dp-card[data-uid]").forEach(c => c.addEventListener("click", () => { cur = dpRecs().find(r => r.uid === c.dataset.uid); mode = "detail"; showTab("status"); renderMain(); if (window.innerWidth < 900) $("#dpMain").scrollIntoView({ behavior: "smooth", block: "start" }); }));
         renderList(); return;
       }
@@ -2264,7 +2272,7 @@ views.release = {
       if (canEdit(r)) acts.push(`<button type="button" class="btn ghost" id="a_edit">✎ แก้ไข${r.status === "returned" ? "และส่งคืน" : ""}</button>`);
       if (canCheck(r)) acts.push(`<button type="button" class="btn ghost" id="a_return">✕ ส่งกลับแก้ไข</button><button type="button" class="btn" id="a_check">✓ ผ่านตรวจสอบ</button>`);
       if (canApprove(r)) acts.push(`<button type="button" class="btn ghost" id="a_reject">✕ ไม่ผ่าน</button><button type="button" class="btn" id="a_approve">✓ อนุมัติ</button>`);
-      if (role === "admin") acts.push(`<button type="button" class="btn ghost danger" id="a_delete">🗑 ลบบันทึก</button>`);
+      if (role === "admin" || (r.status === "draft" && isMine(r))) acts.push(`<button type="button" class="btn ghost danger" id="a_delete">🗑 ลบบันทึก</button>`);
       return `<article class="sheet dp-sheet stamped">
         ${sheetHead("Savannakhet, Lao PDR · Finished Goods Warehouse", "Record No.", "dpNo")}
         <h2 class="title">Sugar Delivery Note</h2>
