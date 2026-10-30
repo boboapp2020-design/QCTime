@@ -17,7 +17,7 @@ const CAN = {
 const SESSION_DAYS = 30;
 const PBKDF2_ITER = 2000; // แพ็กเกจฟรีจำกัด CPU ~10ms ต่อคำขอ — ค่าน้อยพอให้ล็อกอินผ่าน แต่ยังเป็นรหัสแบบ salted hash
 const DEFAULT_USERS = [
-  ["WH01", "1234", "พนักงานคลังสินค้า", R.WH], ["QC01", "1234", "นางสุกสะหวัน จันทะวง", R.QC], ["QC02", "1234", "ท้าวพวงมะไล สุลิยะจันโท", R.QC],
+  ["WH01", "1234", "พนักงานคลังสินค้า", R.WH], ["QC01", "1234", "นางสุกสะหวัน จันทะวง", R.QC], ["QC02", "1234", "ท้าวตี ยอดบุนเรือง", R.QC],
   ["QC03", "1234", "นางสุงา ไชยะลาด", R.QC], ["QC04", "1234", "นางลำดวน แก้วบัวเงิน", R.QC], ["QC05", "1234", "นางสุดสะดา สีวงดาว", R.QC],
   ["QC06", "1234", "ท้าวชมมะนา ชุมพนพักดี", R.QC], ["QA01", "1234", "ท้าววงปะเสิด สีลาพม", R.QA], ["QA02", "1234", "นางอำไพพอน สุวินคำ", R.QA],
   ["QA03", "1234", "นางคำเพีด พมมะสาน", R.QA], ["AP01", "1234", "ท้าวคำตัน สอนพุกปะเสิด", R.APPR], ["AP02", "1234", "ท้าวพูโขง เข็มมะวง", R.APPR],
@@ -33,6 +33,7 @@ const SCHEMA = [
   `CREATE TABLE IF NOT EXISTS photos (uid TEXT NOT NULL, idx INTEGER NOT NULL, data TEXT NOT NULL, updated_at INTEGER, PRIMARY KEY (uid, idx))`,
   `CREATE TABLE IF NOT EXISTS coa (cert TEXT PRIMARY KEY, status TEXT, data TEXT NOT NULL, updated_at INTEGER)`,
   `CREATE TABLE IF NOT EXISTS repack (strike TEXT NOT NULL, day TEXT NOT NULL, rcode TEXT NOT NULL, by TEXT, at INTEGER, PRIMARY KEY (strike, day))`,
+  `CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER, user TEXT, action TEXT, ref TEXT, error TEXT)`,
 ];
 
 /* ---------- helpers ---------- */
@@ -263,6 +264,10 @@ const ACTIONS = {
     return { ok: true, value: rcode, date: day };
   },
 
+  async listEvents({ db, me }) {
+    if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
+    const r = await db.prepare("SELECT at, user, action, ref, error FROM events ORDER BY id DESC LIMIT 200").all(); return { ok: true, events: r.results };
+  },
   async deleteRepack({ db, me, body }) {
     if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
     const r = await db.prepare("DELETE FROM repack WHERE strike = ?1 AND day = ?2").bind(String(body.strike || ""), String(body.day || "")).run(); return { ok: true, deleted: r.meta.changes };
@@ -330,6 +335,10 @@ export async function onRequest(ctx) {
     const res = await fn({ db, me, body, token, origin });
     if (res.raw) return new Response(res.raw, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...CORS } });
     const status = res.status || 200; delete res.status;
+    if (status >= 400 && me && /^(save|delete)/.test(action)) { // เก็บประวัติการบันทึกที่ถูกปฏิเสธ ไว้ตรวจสาเหตุภายหลัง
+      const ref = (body.record && (body.record.certNo || body.record.uid)) || body.certNo || body.uid || body.strike || "";
+      ctx.waitUntil(db.prepare("INSERT INTO events (at, user, action, ref, error) VALUES (?1, ?2, ?3, ?4, ?5)").bind(now(), me.user, action, String(ref), String(res.error || "")).run().catch(() => {}));
+    }
     return json(res, status);
   } catch (e) {
     return fail(String(e && e.message || e), 500);

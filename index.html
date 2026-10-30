@@ -915,6 +915,9 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .coa-truck i { font-style: normal; font-weight: 700; color: var(--muted); }
 .coa-truck small { color: var(--muted); }
 .coa-truck.nod { background: #fdecec; }
+.coa-sync { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--mango-deep, #c77700); } .coa-sync.bad { color: var(--bad); }
+.coa-syncbar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border-radius: 14px; background: #fff6e5; border: 1.5px solid #ffd58a; } .coa-syncbar.bad { background: #fdecec; border-color: #f3b4b7; }
+.coa-syncbar > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; } .coa-syncbar b { font-size: 14px; } .coa-syncbar small { color: var(--ink-2); }
 .coa-truck .rm { border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; color: var(--muted); padding: 0 2px; }
 .cf-tab { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .cf-tab th, .cf-tab td { border: 1px solid #000; padding: 4px 4px; text-align: center; font-size: 14.5px; height: 26px; overflow: hidden; }
@@ -1172,7 +1175,7 @@ const getUser = () => JSON.parse(localStorage.getItem("qc.user") || "null") || {
 const USERS = [
   { user: "wh01",  name: "พนักงานคลังสินค้า",          role: "คลังสินค้า" },
   { user: "qc01",  name: "นางสุกสะหวัน จันทะวง",        role: "QC" },
-  { user: "qc02",  name: "ท้าวพวงมะไล สุลิยะจันโท",     role: "QC" },
+  { user: "qc02",  name: "ท้าวตี ยอดบุนเรือง",          role: "QC" },
   { user: "qc03",  name: "นางสุงา ไชยะลาด",             role: "QC" },
   { user: "qc04",  name: "นางลำดวน แก้วบัวเงิน",        role: "QC" },
   { user: "qc05",  name: "นางสุดสะดา สีวงดาว",          role: "QC" },
@@ -2565,10 +2568,30 @@ const signatureFor = name => { const u = (typeof USERS !== "undefined" ? USERS :
 const addMonthsDmy = (dmy, n) => { const m = String(dmy || "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if (!m) return ""; let y = +m[3]; if (y < 100) y += 2000; const d = new Date(y, +m[2] - 1 + n, +m[1]); return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`; };
 // app roles -> COA roles: marketing (ฝ่ายขาย) writes part 1, QC/QA write part 2, admin does both
 const coaRole = () => { const r = getUser().role || ""; return r === "ผู้ดูแลระบบ" ? "admin" : r === "ฝ่ายขาย" ? "sales" : r === "ผู้อนุมัติ" ? "approver" : "qc"; };
+// ส่งคิวใบ COA ขึ้นเซิร์ฟเวอร์ทีละรายการ
+// • เน็ต/เซิร์ฟเวอร์มีปัญหา หรือหมดเซสชัน → หยุด เก็บไว้ส่งใหม่
+// • เซิร์ฟเวอร์ปฏิเสธ (ไม่มีสิทธิ์/ข้อมูลผิด) → ไม่ทิ้ง: ติดป้าย error ไว้กับรายการ ใบยังอยู่ในเครื่อง แสดง ⚠ ให้เห็นและกดส่งใหม่ได้
+const coaQueue = () => JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]");
+const coaQueueSave = q => localStorage.setItem(COA_KEY.queue, JSON.stringify(q));
+const coaSyncState = certNo => { const q = coaQueue().filter(p => (p.record && p.record.certNo === certNo) || p.certNo === certNo); return !q.length ? null : q.some(p => p.error) ? { failed: true, error: q.find(p => p.error).error } : { pending: true }; };
+function coaRetry(certNo) { coaQueueSave(coaQueue().map(p => ((p.record && p.record.certNo === certNo) || p.certNo === certNo) ? { ...p, error: undefined } : p)); return coaFlush(); }
 async function coaFlush() {
   const url = apiUrl(); if (!url || !navigator.onLine) return;
-  // re-read the queue each step so items added during a POST are not overwritten
-  while (true) { const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); if (!q.length) break; try { const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) }); const r = await http.json(); if (!r.ok) { if (http.status !== 400 && http.status !== 403) break; toast(`<b>เซิร์ฟเวอร์ไม่รับใบ COA นี้</b> ${esc(r.error || "")}`, 4000); } const q2 = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q2.shift(); localStorage.setItem(COA_KEY.queue, JSON.stringify(q2)); } catch (e) { break; } }
+  while (true) {
+    const q = coaQueue(); const item = q.find(p => !p.error); if (!item) break;
+    try {
+      const { error, qid, ...payload } = item;
+      const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }); const r = await http.json();
+      const q2 = coaQueue(); const k = q2.findIndex(p => p.qid ? p.qid === item.qid : JSON.stringify(p) === JSON.stringify(item));
+      if (!r.ok) {
+        if (http.status !== 400 && http.status !== 403) break;
+        if (k >= 0) { q2[k].error = r.error || "เซิร์ฟเวอร์ไม่รับ"; coaQueueSave(q2); }
+        toast(`<b>ส่งใบ COA ไม่สำเร็จ</b> ${esc(r.error || "")} · ใบยังอยู่ในเครื่อง กดส่งใหม่ได้`, 5000); continue;
+      }
+      if (k >= 0) { q2.splice(k, 1); coaQueueSave(q2); }
+    } catch (e) { break; }
+  }
+  document.dispatchEvent(new CustomEvent("qc:coa"));
 }
 async function coaRefresh() {
   const url = apiUrl(); if (!url || !navigator.onLine) return false;
@@ -2578,7 +2601,7 @@ async function coaRefresh() {
     local.forEach(r => { if (pending.has(r.certNo)) { if (have.has(r.certNo)) merged[have.get(r.certNo)] = r; else merged.push(r); } });
     coaSave(merged); return true; } catch (e) { return false; }
 }
-function coaPush(rec) { const recs = coaRecs(); const i = recs.findIndex(x => x.certNo === rec.certNo); if (i >= 0) recs[i] = rec; else recs.push(rec); coaSave(recs); const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q.push({ action: "saveCoa", record: rec }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); return coaFlush(); }
+function coaPush(rec) { const recs = coaRecs(); const i = recs.findIndex(x => x.certNo === rec.certNo); if (i >= 0) recs[i] = rec; else recs.push(rec); coaSave(recs); const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q.push({ action: "saveCoa", record: rec, qid: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); return coaFlush(); }
 
 views.coa = {
   bar: true, title: "ออกใบ COA", sub: "Certificate of Analysis · " + COA_FORM, icon: "btn-coa.png", accent: "mango",
@@ -2748,7 +2771,7 @@ views.coa = {
     function renderList() {
       const q = $("#c_q").value.trim().toLowerCase(); const list = coaRecs().filter(r => !q || `${r.certNo} ${r.customer} ${r.truckNo} ${r.lotNumber} ${(r.lots || []).map(l => l.strike).join(" ")}`.toLowerCase().includes(q)).sort((a, b) => (b.ts || 0) - (a.ts || 0));
       $("#c_count").textContent = `${fmtInt(coaRecs().length)} ใบ`;
-      const card = r => `<button type="button" class="dp-card ${cur && r.certNo === cur.certNo ? "on" : ""}" data-no="${esc(r.certNo)}"><div class="l1"><b>${esc(r.certNo)}</b><span class="pill ${COA_STATUS[stOf(r)][1]}">${COA_STATUS[stOf(r)][0]}</span></div><div class="l2">${esc(r.customer || "—")} · ${esc(r.grade || "—")}</div><div class="l3"><span>${isoToDmy(r.reqDate)} · ${r.truckNo ? "รถ " + esc(r.truckNo) + " · " : ""}Lot ${(r.lots || []).length ? r.lots.map(l => esc(l.strike)).join(", ") : esc(r.lotNumber || "—")}</span></div></button>`;
+      const card = r => `<button type="button" class="dp-card ${cur && r.certNo === cur.certNo ? "on" : ""}" data-no="${esc(r.certNo)}"><div class="l1"><b>${esc(r.certNo)}</b><span class="pill ${COA_STATUS[stOf(r)][1]}">${COA_STATUS[stOf(r)][0]}</span></div>${(() => { const s = r.status !== "new" && coaSyncState(r.certNo); return s ? `<div class="coa-sync ${s.failed ? "bad" : ""}">${s.failed ? "⚠ ส่งขึ้นระบบไม่สำเร็จ" : "⏳ รอส่งขึ้นระบบ"}</div>` : ""; })()}<div class="l2">${esc(r.customer || "—")} · ${esc(r.grade || "—")}</div><div class="l3"><span>${isoToDmy(r.reqDate)} · ${r.truckNo ? "รถ " + esc(r.truckNo) + " · " : ""}Lot ${(r.lots || []).length ? r.lots.map(l => esc(l.strike)).join(", ") : esc(r.lotNumber || "—")}</span></div></button>`;
       $("#c_list").innerHTML = (cur && cur.status === "new" ? card(cur) : "") + list.map(card).join("") || `<p class="muted" style="font-size:13px">ยังไม่มีใบ COA · กด เพิ่ม COA เพื่อเริ่ม</p>`;
     }
 
@@ -2763,6 +2786,7 @@ views.coa = {
       const f = (id, label, ctl, req) => `<div class="field"><label class="${req ? "req" : ""}" for="${id}">${label}</label>${ctl}</div>`;
       const dis = p1open ? "" : "disabled"; const dis2 = p2 ? "" : "disabled";
       $("#c_editor").innerHTML = `
+        ${(() => { const s = cur.status !== "new" && coaSyncState(cur.certNo); return !s ? "" : s.failed ? `<div class="coa-syncbar bad"><div><b>⚠ ใบนี้ยังไม่ได้บันทึกขึ้นระบบ</b><span>เซิร์ฟเวอร์ปฏิเสธ: ${esc(s.error)}</span><small>ผู้อื่น (เช่น ผู้อนุมัติ) จะยังไม่เห็นใบนี้ จนกว่าจะส่งสำเร็จ</small></div><button type="button" class="btn sm" id="e_retry">ส่งอีกครั้ง</button></div>` : `<div class="coa-syncbar"><div><b>⏳ รอส่งขึ้นระบบ</b><span>ใบนี้ยังอยู่ในเครื่องนี้ จะส่งเองเมื่อออนไลน์ · ผู้อื่นยังไม่เห็น</span></div><button type="button" class="btn sm ghost" id="e_retry">ส่งตอนนี้</button></div>`; })()}
         <div class="coa-sec"><div class="section-title"><h2>ส่วนที่ 1 · การตลาด</h2><span class="pill ${COA_STATUS[st][1]}">${COA_STATUS[st][0]}</span></div>
           <div class="grid-2">${f("e_date", "Date", `<input class="input" id="e_date" type="date" value="${esc(cur.reqDate)}" data-f="reqDate" ${dis}>`, true)}${f("e_cert", "Certificate No.", `<input class="input" id="e_cert" value="${esc(cur.certNo)}" data-f="certNo" ${saved ? "readonly" : dis}>`, true)}</div>
           ${f("e_reqNo", "COA Request No. (ฝกต.)", `<input class="input" id="e_reqNo" value="${esc(cur.reqNo)}" data-f="reqNo" placeholder="เลขที่คำขอจากฝ่ายการตลาด" ${dis}>`)}
@@ -2803,6 +2827,7 @@ views.coa = {
                 ? `<div class="verdict pass">${ICON.okc} อนุมัติแล้ว${cur.approvedActionBy ? " · โดย " + esc(cur.approvedActionBy) : ""} · กดปุ่มด้านล่างเพื่อพิมพ์ใบ</div>`
                 : ""}`}
         </div>`;
+      $("#e_retry")?.addEventListener("click", async () => { toast("กำลังส่ง…"); await coaRetry(cur.certNo); const s = coaSyncState(cur.certNo); if (!s) { toast("<b>ส่งขึ้นระบบแล้ว</b> ผู้อื่นเห็นใบนี้แล้ว"); await coaRefresh(); } renderEditor(); renderList(); });
       $("#e_edit1")?.addEventListener("click", () => { if (!canReq) return; p1edit = true; renderEditor(); renderPaper(); });
       $("#e_done1")?.addEventListener("click", () => { cur = null; p1edit = false; renderEditor(); renderPaper(); renderList(); });
       if (!p1open && !p2 && !(canApprove && stOf(cur) === "wait_approve")) return;
@@ -2905,6 +2930,8 @@ views.coa = {
     const boot = () => { if (cur) { if (cur.status !== "new") { const r = coaRecs().find(x => x.certNo === cur.certNo); if (r) open(r); else { renderEditor(); renderPaper(); } } else { renderEditor(); renderPaper(); } } else { const want = params.get("no") && coaRecs().find(x => x.certNo === params.get("no")); const l = want || coaRecs().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0]; if (l) open(l); else { cur = null; renderEditor(); renderPaper(); } } renderList(); }; // ไม่สร้างใบเปล่าอัตโนมัติ — กด + เพิ่ม COA เอง
     loadQuality(false).then(boot); coaRefresh().then(() => { boot(); if (tab === "dash") renderDash(); }); coaFlush();
     dpRefresh().then(ok => { if (ok && cur) renderEditor(); }); // รายการรถ/Lot ที่จ่ายออก (ฝ่ายขายเปิดหน้าจ่ายออกไม่ได้ จึงโหลดที่นี่)
+    let lastSync = ""; const onCoaSync = () => { if (!document.body.contains(root)) { document.removeEventListener("qc:coa", onCoaSync); return; } renderList(); const s = cur && cur.status !== "new" ? JSON.stringify(coaSyncState(cur.certNo)) : ""; if (s !== lastSync) { lastSync = s; if (cur) renderEditor(); } };
+    document.addEventListener("qc:coa", onCoaSync); // อัปเดตป้ายรอส่ง/ส่งไม่สำเร็จ ทั้งในรายการและในใบที่เปิดอยู่
     if (params.get("tab") === "dash") showTab("dash");
   },
 };
