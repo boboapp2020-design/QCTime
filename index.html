@@ -102,6 +102,9 @@ h1, h2, h3, p { margin: 0; }
 }
 .landing .brand svg { width: 1.35em; height: 1.35em; flex: none; }
 .landing .top-actions .user-chip { height: clamp(38px, 4.4vw, 52px); padding: 4px 16px 4px 5px; border-radius: 999px; background: rgba(255,255,255,.86); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 4px 16px rgba(0,50,100,.2); color: var(--ink); font-size: clamp(13px, 1.3vw, 16px); font-weight: 500; max-width: 46vw; }
+.install-btn { display: inline-flex; align-items: center; gap: 6px; height: clamp(38px, 4.4vw, 52px); padding: 0 16px; border: 0; border-radius: 999px; background: var(--sky, #1e90ff); color: #fff; font: inherit; font-size: clamp(13px, 1.3vw, 16px); font-weight: 500; cursor: pointer; box-shadow: 0 4px 12px rgba(0,60,140,.25); white-space: nowrap; }
+.install-btn svg { width: 18px; height: 18px; } .install-btn:hover { filter: brightness(1.06); } .install-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+@media (max-width: 640px) { .install-btn span { display: none; } .install-btn { padding: 0; width: clamp(38px, 4.4vw, 52px); justify-content: center; } }
 .landing .top-actions .user-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .landing .top-actions .user-chip .avatar { width: calc(clamp(38px, 4.4vw, 52px) - 8px); height: calc(clamp(38px, 4.4vw, 52px) - 8px); background: var(--sky-deep); font-size: clamp(13px, 1.3vw, 17px); }
 .landing .top-actions { position: absolute; top: clamp(10px, 2vh, 22px); right: clamp(10px, 2vw, 26px); display: flex; gap: clamp(8px, 1vw, 12px); z-index: 5; }
@@ -1306,6 +1309,22 @@ function renderPhone() {
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-phone]"); if (!b) return; localStorage.setItem("qc.phone", "1"); renderPhone(); });
 if (IN_FRAME) document.documentElement.classList.add("in-frame");
+/* ---------- ติดตั้งเป็นแอป (PWA) ---------- */
+// service worker: ทำให้ Android/คอมพิวเตอร์ติดตั้งได้ และเปิดหน้าแอปได้แม้เน็ตไม่ดี (ข้อมูล /api ไม่ถูกเก็บ)
+if ("serviceWorker" in navigator && !IN_FRAME && location.protocol === "https:") addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+let installEvt = null;
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const canInstall = () => !IN_FRAME && !isStandalone() && (!!installEvt || isIOS());
+const syncInstallBtns = () => document.querySelectorAll("[data-install]").forEach(b => b.hidden = !canInstall());
+const installBtnHtml = () => `<button type="button" class="install-btn" data-install ${canInstall() ? "" : "hidden"} title="ติดตั้ง QC Time ลงในเครื่องนี้"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg><span>ติดตั้งแอป</span></button>`;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; syncInstallBtns(); });
+addEventListener("appinstalled", () => { installEvt = null; syncInstallBtns(); toast("<b>ติดตั้งแอปแล้ว</b> เปิดจากไอคอน QC Time บนหน้าจอได้เลย", 3500); });
+document.addEventListener("click", async e => {
+  if (!e.target.closest("[data-install]")) return;
+  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); if (r && r.outcome === "accepted") installEvt = null; syncInstallBtns(); return; }
+  if (isIOS()) toast("<b>ติดตั้งบน iPhone / iPad</b><br>1. เปิดหน้านี้ใน Safari<br>2. แตะปุ่มแชร์ (สี่เหลี่ยมมีลูกศรชี้ขึ้น)<br>3. เลือก “เพิ่มไปยังหน้าจอโฮม” แล้วแตะ “เพิ่ม”", 9000);
+});
 const views = {};
 /* ---------- per-role page access (deny-list: role → pages they may NOT open) ---------- */
 const PAGE_DENY = { "คลังสินค้า": ["release", "coa"], "QC": ["coa"], "ฝ่ายขาย": ["release"], "แพ็ค": ["find-lot", "release", "coa"] };
@@ -1345,6 +1364,7 @@ views.home = {
   <div class="landing">
     <div class="brand">${ICON.leaf} Mitr Lao Sugar</div>
     <div class="top-actions">
+      ${installBtnHtml()}
       <div class="user-chip" title="${esc(getUser().name)} · ${esc(getUser().role)}"><span class="avatar"><img src="${avatarImg(getUser())}" alt=""></span><span>${esc(getUser().name)}</span></div>
       <button type="button" class="gear phone" data-phone aria-label="มุมมองแอปมือถือ" title="มุมมองแอปมือถือ">${ICON.phone}</button>
       <button type="button" class="gear logout" id="logoutBtn" aria-label="ออกจากระบบ" title="ออกจากระบบ">${ICON.logout}</button>
@@ -1373,7 +1393,7 @@ views.login = {
   html: () => `
   <div class="landing login">
     <div class="brand">${ICON.leaf} Mitr Lao Sugar</div>
-    <div class="top-actions"><button type="button" class="gear phone" data-phone aria-label="มุมมองมือถือ / แท็บเล็ต" title="มุมมองมือถือ / แท็บเล็ต">${ICON.phone}</button></div>
+    <div class="top-actions">${installBtnHtml()}<button type="button" class="gear phone" data-phone aria-label="มุมมองมือถือ / แท็บเล็ต" title="มุมมองมือถือ / แท็บเล็ต">${ICON.phone}</button></div>
     <header class="logo"><img src="assets/logo.png" alt="QC Time"></header>
     <nav class="login-wrap" aria-label="เข้าสู่ระบบ">
       <div class="login-box">
@@ -3184,7 +3204,7 @@ views.settings = {
 /* ---------- one-time import: Google Sheets / Apps Script (ระบบเดิม) → Cloudflare D1 ---------- */
 // opts.lotsOnly = อัปเดตเฉพาะ Lot + สเปค + Repack (ไม่แตะผู้ใช้ / บันทึกจ่ายออก / COA)
 async function importFromSheets(log, opts = {}) {
-  const oldGet = async q => { const r = await fetch(OLD_SCRIPT_URL + "?" + q + "&_=" + Date.now()); return r.json(); };
+  const oldGet = async q => { const r = await fetch(OLD_SCRIPT_URL + "?" + q + "&_=" + Date.now(), { signal: AbortSignal.timeout(20000) }); return r.json(); }; // สคริปต์เดิมช้า: ตัดที่ 20 วินาที
   log("อ่านชีต Quality และ Spec …");
   const [qt, st] = await Promise.all([fetchSheet(SHEET_DEFAULT.quality), fetchSheet(SHEET_DEFAULT.spec)]);
   const seen = {}; // เลข Strike ซ้ำในชีตเดิม → เก็บแยกแถว ด้วยคีย์ 327, 327~2, …
@@ -3194,6 +3214,7 @@ async function importFromSheets(log, opts = {}) {
   for (let i = 0; i < rows.length; i += 300) { await postApi({ action: "importData", replace: i === 0, quality: rows.slice(i, i + 300) }); log(`  ส่ง Lot ${Math.min(i + 300, rows.length)}/${rows.length}`); }
   await postApi({ action: "importData", specs }); log("  ส่งสเปคแล้ว");
 
+  if (opts.lotsOnly) return; // Repack บันทึกในแอปแล้ว ไม่ต้องดึงจากชีตเดิมอีก
   // รหัส Repack อยู่ในชีต Quality คอลัมน์ V เป็นต้นไป ; วันที่อยู่ในโน้ตของเซลล์ → ถามจากสคริปต์เดิม
   const labels = qt.cols.map(c => (c.label || "").trim()); const kix = labels.indexOf("Lot (Strike)");
   const withRepack = qt.rows.filter(r => r.c.slice(21).some(c => c && /^R\d{5}$/.test(String(c.v ?? "").trim()))).map(r => String((r.c[kix] && (r.c[kix].f ?? r.c[kix].v)) ?? "").trim()).filter(Boolean);
