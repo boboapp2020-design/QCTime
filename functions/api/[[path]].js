@@ -166,11 +166,11 @@ const ACTIONS = {
   },
   async saveLot({ db, me, body }) {
     if (!allow(me, CAN.editQuality)) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขคุณภาพ", status: 403 };
-    const row = { ...(body.row || {}) }; delete row.pending; const strike = String(row.strike || "").trim();
+    const row = { ...(body.row || {}) }; delete row.pending; const strike = String(row.strike || "").trim(); const key = String(row._k || strike).trim(); // _k แยก Lot ที่เลข Strike ซ้ำกัน
     if (!strike) return { ok: false, error: "ไม่มีเลข Strike" };
     const n = Number(row.strikeN ?? strike); row.strike = strike;
     await db.prepare("INSERT INTO quality (strike, n, data, updated_at, updated_by) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(strike) DO UPDATE SET n = ?2, data = ?3, updated_at = ?4, updated_by = ?5")
-      .bind(strike, isFinite(n) ? n : null, JSON.stringify(row), now(), me.user).run();
+      .bind(key, isFinite(n) ? n : null, JSON.stringify({ ...row, _k: key }), now(), me.user).run();
     return { ok: true };
   },
   async saveSpec({ db, me, body }) {
@@ -269,8 +269,8 @@ const ACTIONS = {
     const out = {}; const t = now();
     if (Array.isArray(body.quality)) {
       const st = body.replace ? [db.prepare("DELETE FROM quality")] : [];
-      body.quality.forEach(row => { const s = String(row.strike || "").trim(); if (!s) return; const n = Number(row.strikeN ?? s);
-        st.push(db.prepare("INSERT INTO quality (strike, n, data, updated_at, updated_by) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(strike) DO UPDATE SET n = ?2, data = ?3, updated_at = ?4").bind(s, isFinite(n) ? n : null, JSON.stringify(row), t, "import")); });
+      body.quality.forEach(row => { const s = String(row._k || row.strike || "").trim(); if (!s) return; const n = Number(row.strikeN ?? row.strike);
+        st.push(db.prepare("INSERT INTO quality (strike, n, data, updated_at, updated_by) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(strike) DO UPDATE SET n = ?2, data = ?3, updated_at = ?4").bind(s, isFinite(n) ? n : null, JSON.stringify({ ...row, _k: s }), t, "import")); });
       await inChunks(db, st); out.quality = body.quality.length;
     }
     if (Array.isArray(body.specs)) {

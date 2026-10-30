@@ -1862,7 +1862,7 @@ const pendingCount = () => Object.keys(getEdits()).length;
 function applyEdits() {
   if (!Q.rows) return; const edits = getEdits();
   Q.rows = Q.rows.filter(r => !r.pending);
-  Object.values(edits).forEach(e => { const i = Q.rows.findIndex(r => r.strike === e.row.strike); const row = { ...e.row, pending: true }; if (i >= 0) Q.rows[i] = row; else Q.rows.push(row); });
+  Object.values(edits).forEach(e => { const key = e.row._k || e.row.strike; const i = Q.rows.findIndex(r => (r._k || r.strike) === key); const row = { ...e.row, pending: true }; if (i >= 0) Q.rows[i] = row; else Q.rows.push(row); });
 }
 const nowText = () => { const d = new Date(); const p = n => String(n).padStart(2, "0"); return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
 const toIso = d => { const m = String(d || "").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : ""; };
@@ -1949,7 +1949,7 @@ function renderEditor(root) {
     <td class="strike">${esc(r.strike)}${r.pending ? ' <span class="pill wait" title="ยังไม่ได้ส่งขึ้นฐานข้อมูล">รอซิงค์</span>' : ""}</td><td>${esc(r.grade)}</td><td>${esc(r.date)}</td>
     <td class="r">${fmtN(r.color, 0)}</td><td class="r">${fmtN(r.pol, 2)}</td><td class="r">${fmtN(r.moist, 2)}</td><td class="r">${fmtN(r.invert, 4)}</td><td class="r">${fmtN(r.ma, 2)}</td><td class="r">${fmtN(r.ash, 4)}</td><td class="r">${fmtN(r.sed, 0)}</td>
     <td><span class="pill ${QSTATUS[r.status] || "wait"}">${esc(r.status || "—")}</span></td><td class="muted">${esc(r.by || "—")}</td>
-    <td><button type="button" class="btn sm ghost edit" data-s="${esc(r.strike)}">แก้ไข</button></td></tr>`).join("") || `<tr><td colspan="13" class="muted" style="padding:24px;text-align:center">ไม่พบ Lot</td></tr>`;
+    <td><button type="button" class="btn sm ghost edit" data-s="${esc(r._k || r.strike)}">แก้ไข</button></td></tr>`).join("") || `<tr><td colspan="13" class="muted" style="padding:24px;text-align:center">ไม่พบ Lot</td></tr>`;
   $("#edMore").classList.toggle("hide", list.length <= E.limit);
   $("#edMoreBtn").textContent = `แสดงเพิ่ม (เหลืออีก ${fmtInt(Math.max(0, list.length - E.limit))} รายการ)`;
   $("#edCount").textContent = `${fmtInt(list.length)} จาก ${fmtInt(Q.rows.length)} Lot`;
@@ -1959,9 +1959,9 @@ function initEditor(root) {
   const $ = s => root.querySelector(s); const E = root._E || (root._E = { limit: 100 });
   initChips($("#eGrade").parentElement);
   const F = ["strike", "grade", "date", "bb", "status", "season", "color", "pol", "moist", "invert", "ma", "ash", "sed", "loc", "stock", "bags", "customer", "cert"];
-  let editing = null;
+  let editing = null, editingKey = null;
   function openModal(lot) {
-    editing = lot ? lot.strike : null;
+    editing = lot ? lot.strike : null; editingKey = lot ? (lot._k || lot.strike) : null; // _k แยก Lot ที่เลข Strike ซ้ำกันในข้อมูลเดิม
     $("#lotModalTitle").textContent = lot ? `แก้ไข Lot ${lot.strike}` : "เพิ่ม Lot ใหม่";
     F.forEach(k => { const el = $("#f_" + k); if (!el) return; let v = lot ? lot[k] : ""; if (k === "date") v = toIso(v); if (k === "season" && !lot) v = getSettings().season || (Q.rows?.find(r => r.season)?.season ?? ""); if (k === "status" && !lot) v = "ผ่าน"; el.value = v ?? ""; });
     $("#f_strike").readOnly = !!lot;
@@ -1972,7 +1972,7 @@ function initEditor(root) {
   $("#addLot").addEventListener("click", () => openModal(null));
   $("#lotClose").addEventListener("click", closeModal); $("#lotCancel").addEventListener("click", closeModal);
   $("#lotModal").addEventListener("click", e => { if (e.target.id === "lotModal") closeModal(); });
-  $("#edBody").addEventListener("click", e => { const b = e.target.closest(".edit"); if (!b) return; const lot = Q.rows.find(r => r.strike === b.dataset.s); if (lot) openModal(lot); });
+  $("#edBody").addEventListener("click", e => { const b = e.target.closest(".edit"); if (!b) return; const lot = Q.rows.find(r => (r._k || r.strike) === b.dataset.s); if (lot) openModal(lot); });
   $("#lotForm").addEventListener("submit", async e => {
     e.preventDefault();
     const strike = $("#f_strike").value.trim(), grade = $("#f_grade").value;
@@ -1980,12 +1980,12 @@ function initEditor(root) {
     if (!grade) { toast("เลือกเกรดก่อน"); $("#f_grade").focus(); return; }
     if (!editing && Q.rows.some(r => r.strike === strike)) { toast(`<b>Strike ${esc(strike)} มีอยู่แล้ว</b> เปิดแก้ไขแทน`); openModal(Q.rows.find(r => r.strike === strike)); return; }
     const g = k => $("#f_" + k).value.trim();
-    const row = { strike, strikeN: num(strike), grade, date: fromIso(g("date")), dk: dateKey(fromIso(g("date"))), bb: g("bb"), status: g("status"), season: g("season"),
+    const row = { _k: editingKey || strike, strike, strikeN: num(strike), grade, date: fromIso(g("date")), dk: dateKey(fromIso(g("date"))), bb: g("bb"), status: g("status"), season: g("season"),
       color: num(g("color")), pol: num(g("pol")), moist: num(g("moist")), invert: num(g("invert")), ma: num(g("ma")), ash: num(g("ash")), sed: num(g("sed")),
       loc: g("loc"), stock: g("stock"), bags: g("bags"), customer: g("customer"), cert: g("cert"), by: getUser().name, edited: nowText() };
-    const edits = getEdits(); edits[strike] = { row, at: Date.now(), op: editing ? "edit" : "add" }; setEdits(edits); applyEdits();
+    const edits = getEdits(); edits[row._k] = { row, at: Date.now(), op: editing ? "edit" : "add" }; setEdits(edits); applyEdits();
     closeModal(); renderEditor(root); toast(`<b>บันทึกแล้ว</b> Lot ${esc(strike)} ${apiUrl() ? "กำลังบันทึกลงฐานข้อมูล…" : "(เก็บในเครื่อง รอเชื่อมต่อ Apps Script)"}`);
-    if (apiUrl()) { const r = await syncEdits(); toast(r.failed ? `<b>บันทึกลงฐานข้อมูลไม่สำเร็จ</b> ${esc(r.lastErr)} เก็บไว้รอซิงค์` : `<b>บันทึกขึ้นชีตแล้ว</b> Lot ${esc(strike)}`, 3200); renderEditor(root); root.dispatchEvent(new CustomEvent("qc:data")); }
+    if (apiUrl()) { const r = await syncEdits(); toast(r.failed ? `<b>บันทึกลงฐานข้อมูลไม่สำเร็จ</b> ${esc(r.lastErr)} เก็บไว้รอซิงค์` : `<b>บันทึกลงฐานข้อมูลแล้ว</b> Lot ${esc(strike)}`, 3200); renderEditor(root); root.dispatchEvent(new CustomEvent("qc:data")); }
   });
   $("#eq").addEventListener("input", () => { E.limit = 100; renderEditor(root); });
   $("#eGrade").addEventListener("change", () => { E.limit = 100; renderEditor(root); });
@@ -3164,7 +3164,8 @@ async function importFromSheets(log) {
   const oldGet = async q => { const r = await fetch(OLD_SCRIPT_URL + "?" + q + "&_=" + Date.now()); return r.json(); };
   log("อ่านชีต Quality และ Spec …");
   const [qt, st] = await Promise.all([fetchSheet(SHEET_DEFAULT.quality), fetchSheet(SHEET_DEFAULT.spec)]);
-  const rows = mapQuality(qt).map(r => { const o = { ...r }; delete o.dk; return o; });
+  const seen = {}; // เลข Strike ซ้ำในชีตเดิม → เก็บแยกแถว ด้วยคีย์ 327, 327~2, …
+  const rows = mapQuality(qt).map(r => { const o = { ...r }; delete o.dk; const n = seen[o.strike] = (seen[o.strike] || 0) + 1; o._k = n > 1 ? `${o.strike}~${n}` : o.strike; return o; });
   const specs = mapSpec(st).map(sp => ({ code: sp.code, name: sp.name, alt: sp.alt, product: sp.product, t: Object.fromEntries(SPEC_KEYS.map(k => [k, sp.rules[k] ? sp.rules[k].text : ""])) }));
   log(`  พบ ${rows.length} Lot · ${specs.length} สเปค`);
   for (let i = 0; i < rows.length; i += 300) { await postApi({ action: "importData", replace: i === 0, quality: rows.slice(i, i + 300) }); log(`  ส่ง Lot ${Math.min(i + 300, rows.length)}/${rows.length}`); }
