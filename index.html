@@ -1467,15 +1467,15 @@ const fmtN = (v, d) => v === null || v === undefined ? "—" : d === 0 ? fmtInt(
 const timeAgo = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "เมื่อสักครู่" : m < 60 ? `${m} นาทีที่แล้ว` : `${Math.round(m / 60)} ชม.ที่แล้ว`; };
 
 /* ---------- per-role access to find-lot tabs (search / dash / edit) ---------- */
-const flAllowedTabs = () => { const r = getUser().role || ""; if (r === "คลังสินค้า" || r === "QC" || r === "ฝ่ายขาย") return ["search"]; return ["search", "dash", "edit"]; };
+const flAllowedTabs = () => { const r = getUser().role || ""; if (r === "คลังสินค้า" || r === "QC" || r === "ฝ่ายขาย") return ["search", "cust"]; return ["search", "cust", "dash", "edit"]; };
 views["find-lot"] = {
   bar: true, title: "ค้นหา Lot", sub: "ข้อมูลคุณภาพจาก sheet Quality และ Spec", icon: "btn-find-lot.png", accent: "sky",
-  tabs: `<div class="fl-tabs" role="tablist"><button type="button" class="tab on" data-tab="search" role="tab">ค้นหาสินค้า</button><button type="button" class="tab" data-tab="dash" role="tab">ภาพรวมและแนวโน้ม</button><button type="button" class="tab" data-tab="edit" role="tab">แก้ไขและเพิ่มคุณภาพ</button></div>`,
+  tabs: `<div class="fl-tabs" role="tablist"><button type="button" class="tab on" data-tab="search" role="tab">ค้นหาสินค้า</button><button type="button" class="tab" data-tab="cust" role="tab">ค้นหาลูกค้า</button><button type="button" class="tab" data-tab="dash" role="tab">ภาพรวมและแนวโน้ม</button><button type="button" class="tab" data-tab="edit" role="tab">แก้ไขและเพิ่มคุณภาพ</button></div>`,
   html: params => `
   <main class="page wide">
   <div class="fl-layout" id="tabSearch">
     <section class="panel"><div class="panel-body">
-      <div class="fl-block">
+      <div class="fl-block s-only">
         <h2>${ICON.lens.replace('class="lens"', "")} ค้นหาเลข Strike</h2>
         <form class="search" id="strikeForm" onsubmit="return false">
           ${ICON.lens}
@@ -1483,20 +1483,20 @@ views["find-lot"] = {
           <button type="submit" class="go">ค้นหา</button>
         </form>
       </div>
-      <div class="fl-block">
+      <div class="fl-block c-only hide">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="m15.5 11.5 2 2 4-4"/></svg> ลูกค้า <span class="u">แสดงเฉพาะ Lot ที่ผ่านเกณฑ์</span></h2>
         <select class="select" id="fCust"><option value="">— ทุกลูกค้า —</option></select>
       </div>
-      <div class="fl-block">
+      <div class="fl-block s-only">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18" fill="currentColor" stroke="none"/></svg> ช่วงค่าสี <span class="u">ICUMSA (IU)</span></h2>
         <div class="range"><input id="cMin" type="number" inputmode="numeric" placeholder="ต่ำสุด"><span class="dash">–</span><input id="cMax" type="number" inputmode="numeric" placeholder="สูงสุด"></div>
       </div>
-      <div class="fl-block">
+      <div class="fl-block s-only">
         <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="15" r="4.5"/></svg> ช่วงขนาดเม็ด <span class="u">M.A. (mm)</span></h2>
         <div class="range"><input id="mMin" type="number" inputmode="decimal" step="0.01" placeholder="ต่ำสุด"><span class="dash">–</span><input id="mMax" type="number" inputmode="decimal" step="0.01" placeholder="สูงสุด"></div>
       </div>
-      <div class="fl-block"><h2>เกรด</h2>${chips("fGrade", [["", "ทั้งหมด"], ["DCR", "DCR"], ["VHP", "VHP"], ["Organic", "Organic"]])}</div>
-      <div class="fl-block"><h2>สถานะ Spec</h2>${chips("fStatus", [["", "ทั้งหมด"], ["ผ่าน", "ผ่าน"], ["เฝ้าระวัง", "เฝ้าระวัง"], ["ไม่ผ่าน", "ไม่ผ่าน"]])}</div>
+      <div class="fl-block s-only"><h2>เกรด</h2>${chips("fGrade", [["", "ทั้งหมด"], ["DCR", "DCR"], ["VHP", "VHP"], ["Organic", "Organic"]])}</div>
+      <div class="fl-block s-only"><h2>สถานะ Spec</h2>${chips("fStatus", [["", "ทั้งหมด"], ["ผ่าน", "ผ่าน"], ["เฝ้าระวัง", "เฝ้าระวัง"], ["ไม่ผ่าน", "ไม่ผ่าน"]])}</div>
       <div class="fl-actions"><button class="btn ghost sm" id="clear" type="button">ล้างตัวกรอง</button></div>
       <div class="fl-status busy" id="dataStatus"><span class="dot"></span><span id="dataText">กำลังโหลดข้อมูลจาก Google Sheets…</span>
         <button class="icon-btn" id="reload" aria-label="โหลดข้อมูลใหม่" title="โหลดข้อมูลใหม่" style="width:32px;height:32px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
@@ -1510,14 +1510,14 @@ views["find-lot"] = {
   init(root, params) {
     const $ = s => root.querySelector(s);
     initChips(root);
-    let selected = null, showFails = !!getSettings().showFails;
+    let selected = null, mode = "search", showFails = !!getSettings().showFails;
     const allowedTabs = flAllowedTabs(); // per-role access to the find-lot tabs
     const dg = getSettings().defaultGrade; if (dg) root.querySelectorAll("#fGrade .chip").forEach(c => c.classList.toggle("on", c.dataset.value === dg));
-    const showTab = t => { if (!allowedTabs.includes(t)) t = "search"; document.querySelectorAll(".fl-tabs .tab").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }); $("#tabSearch").classList.toggle("hide", t !== "search"); $("#tabDash").classList.toggle("hide", t !== "dash"); $("#tabEdit").classList.toggle("hide", t !== "edit"); if (t === "dash") renderDashboard(root); if (t === "edit") renderEditor(root); };
+    const showTab = t => { if (!allowedTabs.includes(t)) t = "search"; document.querySelectorAll(".fl-tabs .tab").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }); mode = t === "cust" ? "cust" : "search"; $("#tabSearch").classList.toggle("hide", t !== "search" && t !== "cust"); root.querySelectorAll("#tabSearch .s-only").forEach(e => e.classList.toggle("hide", t === "cust")); root.querySelectorAll("#tabSearch .c-only").forEach(e => e.classList.toggle("hide", t !== "cust")); if (t === "search" || t === "cust") render(); $("#tabDash").classList.toggle("hide", t !== "dash"); $("#tabEdit").classList.toggle("hide", t !== "edit"); if (t === "dash") renderDashboard(root); if (t === "edit") renderEditor(root); };
     initEditor(root);
     root.addEventListener("qc:data", () => { fillCustomers(); render(); if (!$("#tabDash").classList.contains("hide")) renderDashboard(root); });
     document.querySelectorAll(".fl-tabs .tab").forEach(b => { if (!allowedTabs.includes(b.dataset.tab)) { b.remove(); return; } b.addEventListener("click", () => showTab(b.dataset.tab)); });
-    if ((params.get("tab") === "dash" || params.get("tab") === "edit") && allowedTabs.includes(params.get("tab"))) showTab(params.get("tab"));
+    if ((params.get("tab") === "dash" || params.get("tab") === "edit" || params.get("tab") === "cust") && allowedTabs.includes(params.get("tab"))) showTab(params.get("tab"));
     const MAX_CHIPS = 300;
 
     function filters() {
@@ -1526,7 +1526,9 @@ views["find-lot"] = {
     }
     function filtered() {
       if (!Q.rows) return [];
-      const f = filters(); const cs = custSpecs(f.cust);
+      const f = filters();
+      if (mode === "cust") { const cs = custSpecs(f.cust); return cs ? Q.rows.filter(r => custPasses(r, cs)).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1)) : []; } // แท็บค้นหาลูกค้า: กรองตามลูกค้าอย่างเดียว
+      const cs = null; // แท็บค้นหาสินค้า: ไม่ใช้ตัวกรองลูกค้า
       return Q.rows.filter(r =>
         (!f.s || r.strike.includes(f.s)) && (!f.g || r.grade === f.g) && (!f.st || r.status === f.st) &&
         (f.cMin === null || (r.color !== null && r.color >= f.cMin)) && (f.cMax === null || (r.color !== null && r.color <= f.cMax)) &&
@@ -1538,12 +1540,12 @@ views["find-lot"] = {
     const custSpecs = name => name ? (Q.specs || []).filter(s => s.name === name) : null;
     const custPasses = (r, cs) => cs.some(s => s.grade === r.grade && checkSpec(r, s).ok);
     function custBanner(list) {
+      if (mode !== "cust") return "";
       const name = $("#fCust").value; const cs = custSpecs(name); if (!cs || !cs.length) return "";
       const grades = [...new Set(cs.map(s => s.grade).filter(Boolean))];
       const base = Q.rows.filter(r => grades.includes(r.grade));
-      const passAll = base.filter(r => custPasses(r, cs)).length;
       return `<div class="cust-banner"><div class="cb-main"><span class="cb-lbl">ลูกค้า</span><b>${esc(custLabel(cs[0]))}</b><span class="cb-prod">${cs.map(s => esc(s.product || s.grade)).join(" · ")}</span></div>
-        <div class="cb-stat"><b>${fmtInt(list.length)}</b><span>Lot ผ่านเกณฑ์${list.length !== passAll ? ` (ตามตัวกรอง) · ทั้งหมด ${fmtInt(passAll)}` : ""} จาก ${fmtInt(base.length)} Lot เกรด ${esc(grades.join("/") || "—")}</span></div>
+        <div class="cb-stat"><b>${fmtInt(list.length)}</b><span>Lot ผ่านเกณฑ์ จาก ${fmtInt(base.length)} Lot เกรด ${esc(grades.join("/") || "—")}</span></div>
         <button type="button" class="cb-x" id="custClear" aria-label="ล้างลูกค้า" title="ล้างลูกค้า">×</button></div>`;
     }
     const pill = s => `<span class="pill ${QSTATUS[s] || "wait"}">${esc(s || "—")}</span>`;
@@ -1557,10 +1559,10 @@ views["find-lot"] = {
       const res = specsFor(r), pass = res.filter(x => x.ok), fail = res.filter(x => !x.ok);
       if (!res.length) return `<div class="d-group d-cust"><h3>ผ่านสเปคลูกค้า</h3><p class="muted" style="font-size:13.5px">ไม่มีสเปคลูกค้าสำหรับเกรด ${esc(r.grade)} ใน sheet Spec</p></div>`;
       return `<div class="d-group d-cust"><h3>ผ่านสเปคลูกค้า <span class="cnt">${pass.length}/${res.length} ราย</span></h3>
-        ${pass.length ? `<div class="cust-list">${pass.map(x => `<div class="cust ok ${x.spec.name === $("#fCust").value ? "sel" : ""}"><span class="tick">${ICON.tick}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span></div>`).join("")}</div>`
+        ${pass.length ? `<div class="cust-list">${pass.map(x => `<div class="cust ok ${mode === "cust" && x.spec.name === $("#fCust").value ? "sel" : ""}"><span class="tick">${ICON.tick}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span></div>`).join("")}</div>`
                       : `<p class="muted" style="font-size:13.5px">Lot นี้ยังไม่ผ่านสเปคของลูกค้ารายใดในเกรด ${esc(r.grade)}</p>`}
         ${fail.length ? `<button type="button" class="cust-toggle" id="toggleFails">${showFails ? "ซ่อน" : "ดู"}ลูกค้าที่ไม่ผ่าน (${fail.length} ราย)</button>
-          <div class="cust-list ${showFails ? "" : "hide"}">${fail.map(x => `<div class="cust no ${x.spec.name === $("#fCust").value ? "sel" : ""}"><span class="tick">${ICON.cross}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span><span class="why">${esc(x.fails.join(" · "))}</span></div>`).join("")}</div>` : ""}
+          <div class="cust-list ${showFails ? "" : "hide"}">${fail.map(x => `<div class="cust no ${mode === "cust" && x.spec.name === $("#fCust").value ? "sel" : ""}"><span class="tick">${ICON.cross}</span><span class="nm">${esc(custLabel(x.spec))}</span><span class="pd">${esc(x.spec.product)}</span><span class="why">${esc(x.fails.join(" · "))}</span></div>`).join("")}</div>` : ""}
       </div>`;
     }
     function renderDetail(list) {
@@ -1568,6 +1570,7 @@ views["find-lot"] = {
       if (!Q.rows) { el.innerHTML = Q.error ? empty("โหลดข้อมูลไม่ได้", Q.error, true) : empty("กำลังโหลดข้อมูลจาก Google Sheets…"); $("#retry")?.addEventListener("click", () => load(true)); return; }
       const r = list.find(x => x.strike === selected);
       const banner = custBanner(list);
+      if (mode === "cust" && !$("#fCust").value) { el.innerHTML = empty("เลือกลูกค้าเพื่อดู Lot ที่ผ่านเกณฑ์", "ระบบเทียบค่าคุณภาพทุก Lot กับสเปคของลูกค้าใน sheet Spec"); return; }
       if (!r) { el.innerHTML = banner + empty(banner ? "ไม่มี Lot ที่ผ่านเกณฑ์ของลูกค้ารายนี้" : "ไม่พบ Lot ที่ตรงกับเงื่อนไข", banner ? "ลองล้างตัวกรองอื่น หรือเลือกลูกค้ารายอื่น" : "ลองขยายช่วงค่าหรือล้างตัวกรอง"); $("#custClear")?.addEventListener("click", clearCust); return; }
       const strip = banner + `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
         `<button type="button" class="chip ${x.strike === selected ? "on" : ""} ${QSTATUS[x.status] === "hold" ? "hold" : ""}" data-s="${esc(x.strike)}">${esc(x.strike)}</button>`).join("")}${list.length > MAX_CHIPS ? `<span class="more">…และอีก ${fmtInt(list.length - MAX_CHIPS)} รายการ ค้นหาให้แคบลง</span>` : ""}</div></div>`;
