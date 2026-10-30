@@ -2196,12 +2196,34 @@ views.release = {
       $("#dpModalYes").onclick = () => { if (withNote && !ta.value.trim()) { toast("กรุณาระบุเหตุผล"); return; } done(withNote ? ta.value.trim() : true); };
       $("#dpModalNo").onclick = () => done(null);
     });
-    const saveDraftState = () => { if (draft) localStorage.setItem(dpKey.draft, JSON.stringify({ draft, step, editUid })); else localStorage.removeItem(dpKey.draft); };
+    // ร่างที่ถูกลบจะถูกจำ uid ไว้ เพื่อไม่ให้แท็บอื่น/หน้าจอเดิมที่ยังเปิดฟอร์มค้างไว้เขียนร่างนั้นกลับขึ้นมาอีก
+    const DRAFT_DEL_KEY = "qc.dispatch.draftDeleted";
+    const deletedDrafts = () => { try { return JSON.parse(localStorage.getItem(DRAFT_DEL_KEY) || "[]"); } catch (e) { return []; } };
+    const readSaved = () => { try { return JSON.parse(localStorage.getItem(dpKey.draft) || "null"); } catch (e) { return null; } };
+    const saveDraftState = () => {
+      if (draft && !editUid && deletedDrafts().includes(draft.uid)) { draft = null; mode = "empty"; } // ร่างนี้ถูกลบไปแล้ว ห้ามบันทึกซ้ำ
+      if (draft) localStorage.setItem(dpKey.draft, JSON.stringify({ draft, step, editUid })); else localStorage.removeItem(dpKey.draft);
+      saved = readSaved();
+    };
     // ลบร่างที่เขียนค้างไว้ (เก็บในเครื่องเท่านั้น ยังไม่ได้ส่งขึ้นชีต)
-    async function deleteSavedDraft() { if (!await ask("ลบร่าง", "ร่างที่ยังเขียนไม่เสร็จนี้จะถูกลบถาวร กู้คืนไม่ได้")) return; localStorage.removeItem(dpKey.draft); saved = null; if (!draft) mode = "empty"; toast("🗑 ลบร่างแล้ว"); renderList(); renderEntry(); }
+    async function deleteSavedDraft() {
+      if (!await ask("ลบร่าง", "ร่างที่ยังเขียนไม่เสร็จนี้จะถูกลบถาวร กู้คืนไม่ได้")) return;
+      const s = readSaved(); const uid = s && s.draft && s.draft.uid;
+      if (uid) localStorage.setItem(DRAFT_DEL_KEY, JSON.stringify([...deletedDrafts(), uid].slice(-50)));
+      localStorage.removeItem(dpKey.draft); saved = null;
+      if (draft && (!uid || draft.uid === uid)) { draft = null; editUid = null; step = 0; }
+      if (!draft) mode = "empty"; toast("🗑 ลบร่างแล้ว"); renderList(); renderEntry();
+    }
+    // แท็บอื่นลบ/แก้ร่าง → อัปเดตหน้านี้ตาม
+    const onDraftStorage = e => {
+      if (e.key !== dpKey.draft && e.key !== DRAFT_DEL_KEY) return; if (!document.body.contains(root)) { removeEventListener("storage", onDraftStorage); return; }
+      saved = readSaved(); if (draft && !editUid && deletedDrafts().includes(draft.uid)) { draft = null; step = 0; mode = "empty"; }
+      renderList(); if (mode !== "detail") renderEntry();
+    };
+    addEventListener("storage", onDraftStorage);
 
     /* ---- left column ---- */
-    function renderList() {
+    function renderList() { saved = readSaved();
       const recs = visible(); const q = $("#dq").value.trim().toLowerCase();
       const chipsDef = role === "recorder" ? [["all", "ทั้งหมด"], ["draft", "ร่าง"], ["returned", "ส่งกลับ"], ["wait_check", "รอตรวจ"], ["wait_approve", "รออนุมัติ"], ["done", "สำเร็จ"]]
                      : role === "approver" ? [["all", "ทั้งหมด"], ["wait_approve", "รออนุมัติ"], ["returned", "ไม่ผ่าน"], ["done", "สำเร็จ"]]
@@ -2245,7 +2267,7 @@ views.release = {
       bindMain(); renderList();
       if (innerWidth <= 900 && mode === "detail" && tab === "status") $("#dpMain").scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    function renderEntry() {
+    function renderEntry() { saved = readSaved();
       const el = $("#dpEntry");
       if (mode === "wizard") el.innerHTML = wizardHtml(); else if (mode === "confirm") el.innerHTML = confirmHtml();
       else {
