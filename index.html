@@ -520,7 +520,8 @@ body.phone-mode > #app { display: none; }
 .cust-lots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .cust-lots button { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; font: inherit; font-size: 16px; cursor: pointer; text-align: left; }
 .cust-lots button:hover, .cust-lots button:focus-visible { border-color: var(--sky); background: #f3f9ff; }
-.cust-lots b { font-variant-numeric: tabular-nums; font-weight: 600; }
+.cust-lots b { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 4.5em; }
+.cust-lots .cl-date { flex: 1; margin-left: 16px; font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .cust-lots i { font-style: normal; font-size: 22px; line-height: 1; color: var(--ink-3); }
 .cust-back { border: 0; background: transparent; color: var(--sky-deep, #1677d8); font: inherit; font-weight: 600; cursor: pointer; padding: 4px 0; margin-bottom: 10px; }
 .d-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 0 34px; }
@@ -1588,7 +1589,7 @@ views["find-lot"] = {
     initEditor(root);
     root.addEventListener("qc:data", () => { fillCustomers(); render(); if (!$("#tabDash").classList.contains("hide")) renderDashboard(root); });
     document.querySelectorAll(".fl-tabs .tab").forEach(b => { if (!allowedTabs.includes(b.dataset.tab)) { b.remove(); return; } b.addEventListener("click", () => showTab(b.dataset.tab)); });
-    if ((params.get("tab") === "dash" || params.get("tab") === "edit" || params.get("tab") === "cust") && allowedTabs.includes(params.get("tab"))) showTab(params.get("tab"));
+    if ((params.get("tab") === "dash" || params.get("tab") === "edit" || params.get("tab") === "cust") && allowedTabs.includes(params.get("tab"))) queueMicrotask(() => showTab(params.get("tab"))); // รอให้ init ประกาศฟังก์ชันครบก่อน (เปิดด้วย ?tab=cust แล้วเคยค้าง)
     const MAX_CHIPS = 300;
 
     function filters() {
@@ -1598,7 +1599,7 @@ views["find-lot"] = {
     function filtered() {
       if (!Q.rows) return [];
       const f = filters();
-      if (mode === "cust") { const cs = custSpecs(f.cust); return cs ? Q.rows.filter(r => custPasses(r, cs)).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1)) : []; } // แท็บค้นหาลูกค้า: กรองตามลูกค้าอย่างเดียว
+      if (mode === "cust") { const cs = custSpecs(f.cust); return cs ? Q.rows.filter(r => custPasses(r, cs)).sort((a, b) => (a.dk || "99999999").localeCompare(b.dk || "99999999") || (a.strikeN ?? 1e9) - (b.strikeN ?? 1e9)) : []; } // FIFO: วันผลิตเก่าสุดขึ้นก่อน // แท็บค้นหาลูกค้า: กรองตามลูกค้าอย่างเดียว
       const cs = null; // แท็บค้นหาสินค้า: ไม่ใช้ตัวกรองลูกค้า
       return Q.rows.filter(r =>
         (!f.s || r.strike.includes(f.s)) && (!f.g || r.grade === f.g) && (!f.st || r.status === f.st) &&
@@ -1644,7 +1645,7 @@ views["find-lot"] = {
       if (mode === "cust" && !$("#fCust").value) { el.innerHTML = empty("เลือกลูกค้าเพื่อดู Lot ที่ผ่านเกณฑ์", "ระบบเทียบค่าคุณภาพทุก Lot กับสเปคของลูกค้าใน sheet Spec"); return; }
       if (!r) { el.innerHTML = banner + empty(banner ? "ไม่มี Lot ที่ผ่านเกณฑ์ของลูกค้ารายนี้" : "ไม่พบ Lot ที่ตรงกับเงื่อนไข", banner ? "ลองล้างตัวกรองอื่น หรือเลือกลูกค้ารายอื่น" : "ลองขยายช่วงค่าหรือล้างตัวกรอง"); $("#custClear")?.addEventListener("click", clearCust); return; }
       if (mode === "cust" && !custOpen) { // แท็บค้นหาลูกค้า: แสดงเฉพาะเลข Lot เรียงแนวตั้ง กดเข้าไปดูรายละเอียดเอง
-        el.innerHTML = banner + `<ul class="cust-lots">${list.map(x => `<li><button type="button" data-lot="${esc(x.strike)}"><b>${esc(x.strike)}</b><i aria-hidden="true">›</i></button></li>`).join("")}</ul>`;
+        el.innerHTML = banner + `<ul class="cust-lots">${list.map(x => `<li><button type="button" data-lot="${esc(x.strike)}"><b>${esc(x.strike)}</b><span class="cl-date">ผลิต ${esc(x.date || "—")}</span><i aria-hidden="true">›</i></button></li>`).join("")}</ul>`;
         $("#custClear")?.addEventListener("click", clearCust); return;
       }
       const strip = banner + (mode === "cust" ? `<button type="button" class="cust-back" id="custBack">‹ กลับรายการ Lot</button>` : `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
