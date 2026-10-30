@@ -708,6 +708,14 @@ body.phone-mode > #app { display: none; }
 .dp-wiz-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .dp-wiz-head small { font-size: 12.5px; color: var(--ink-2); }
 .dp-wiz-head h2 { font-size: 20px; font-weight: 500; }
+.dp-prog { margin: 0 0 12px; }
+.dp-prog-top { display: flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.dp-prog-top b { font-size: 15px; color: var(--leaf-deep); font-variant-numeric: tabular-nums; }
+.dp-prog-top small { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+.dp-prog-track { height: 10px; margin-top: 6px; border-radius: 999px; background: var(--paper-2); overflow: hidden; }
+.dp-prog-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #5fd46f, var(--leaf)); transition: width .35s ease; }
+.dp-prog-fill.full { background: var(--leaf-deep); }
+@media (prefers-reduced-motion: reduce) { .dp-prog-fill { transition: none; } }
 .dp-stepper { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 18px; }
 .dp-stepper .st { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: var(--paper-2); font-size: 12.5px; color: var(--ink-2); }
 .dp-stepper .st i { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 1.5px solid var(--line); display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 12px; font-weight: 500; flex: none; }
@@ -1964,6 +1972,18 @@ const fmtTs = t => { const d = new Date(t); const p = n => String(n).padStart(2,
 const dpTons = d => { const kg = packKg(d.pack || ""); if (!kg) return 0; const bags = (d.lots || []).reduce((s, l) => s + (+l.bags || 0), 0); return +((kg * bags) / 1000).toFixed(3); };
 const dpBags = d => (d.lots || []).reduce((s, l) => s + (+l.bags || 0), 0);
 const dpFails = d => DP.CHECKS.filter(c => !c.neutral && d.checks && d.checks[c.id] === "b");
+// ความคืบหน้าฟอร์มจ่ายออก: นับช่องบังคับที่กรอกแล้วทั้ง 4 ขั้นตอน (ใช้เกณฑ์เดียวกับ validateStep)
+function dpProgress(d) {
+  const lots = d.lots || []; const cont = d.truckType === "รถตู้คอนเทนเนอร์ (Container)";
+  const steps = [
+    [!!d.date, !!d.timeStart, !!d.plate, !!d.customer, !!d.truckType],
+    [...DP.CHECKS.map(c => !!(d.checks && d.checks[c.id])), (d.photos || []).length > 0],
+    [!!d.sugarType, !!d.pack, !!d.bay, lots.length > 0 && lots.every(l => l.no && +l.bags > 0)],
+    [!!d.tarp, ...(cont ? [!!d.seal] : []), !!d.timeEnd, !!d.driverName, !!d.logisticsName],
+  ];
+  const done = steps.reduce((s, a) => s + a.filter(Boolean).length, 0), total = steps.reduce((s, a) => s + a.length, 0);
+  return { done, total, pct: total ? Math.round(done / total * 100) : 0, steps: steps.map(a => ({ done: a.filter(Boolean).length, total: a.length })) };
+}
 // ปีการผลิต/ฤดู อัตโนมัติจากปีปัจจุบัน: ปี 2026 → "25 26", ปี 2027 → "26 27"
 const currentSeason = () => { const y = new Date().getFullYear(); const p = n => String(n % 100).padStart(2, "0"); return `${p(y - 1)} ${p(y)}`; };
 function dpNewDraft() {
@@ -2196,7 +2216,9 @@ views.release = {
     const chipsOf = (id, opts, val) => `<div class="chips" data-chips id="${id}">${opts.map(o => `<button type="button" class="chip ${o === val ? "on" : ""}" data-value="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
     function wizardHtml() {
       const d = draft;
-      const stepper = `<div class="dp-stepper">${DP.STEPS.map((s, i) => `<div class="st ${i === step ? "on" : i < step ? "done" : ""}"><i>${i + 1}</i><span>${s}</span></div>`).join("")}</div>`;
+      const pg = dpProgress(d);
+      const progress = `<div class="dp-prog" id="dpProg" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pg.pct}" aria-label="ความคืบหน้าการบันทึก"><div class="dp-prog-top"><span>ความคืบหน้า</span><b id="dpProgPct">${pg.pct}%</b><small id="dpProgTxt">กรอกแล้ว ${pg.done}/${pg.total} ช่องบังคับ</small></div><div class="dp-prog-track"><div class="dp-prog-fill" id="dpProgFill" style="width:${pg.pct}%"></div></div></div>`;
+      const stepper = progress + `<div class="dp-stepper">${DP.STEPS.map((s, i) => `<div class="st ${i === step ? "on" : i < step ? "done" : ""}"><i>${i + 1}</i><span>${s}</span></div>`).join("")}</div>`;
       let inner = "";
       if (step === 0) inner = `
         <h3 class="dp-h">วันที่และเวลา</h3>
@@ -2290,13 +2312,14 @@ views.release = {
     }
 
     /* ---- events ---- */
+function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); if (!fill) return; fill.style.width = p.pct + "%"; $("#dpProgPct").textContent = p.pct + "%"; $("#dpProgTxt").textContent = `กรอกแล้ว ${p.done}/${p.total} ช่องบังคับ`; $("#dpProg").setAttribute("aria-valuenow", p.pct); fill.classList.toggle("full", p.pct === 100); }
     function readStep() {
       const d = draft; const g = id => { const el = $("#" + id); return el ? el.value.trim() : undefined; };
       if (step === 0) { d.date = g("w_date") || d.date; d.prodYear = g("w_prodYear"); d.timeStart = g("w_timeStart"); d.plate = g("w_plate"); d.transport = g("w_transport"); d.customer = g("w_customer"); d.truckType = chipValue($("#w_truck")); d.coa = swOn($("#w_coa")); }
       if (step === 1) { d.otherNote = g("w_otherNote"); }
       if (step === 2) { d.sugarType = g("w_sugarType"); d.pack = g("w_pack"); d.bay = chipValue($("#w_bay")); root.querySelectorAll(".lot-row").forEach((row, i) => { d.lots[i].no = row.querySelector(".lotno").value.trim(); d.lots[i].bags = row.querySelector(".bags input").value.trim(); const rc = row.querySelector(".rchk"); if (rc) d.lots[i].r = rc.checked; const rn = row.querySelector(".rnum"); if (rn) d.lots[i].rNum = rn.value.trim(); }); d.tons = dpTons(d); }
       if (step === 3) { d.tarp = chipValue($("#w_tarp")); d.seal = g("w_seal"); d.timeEnd = g("w_timeEnd"); d.note = g("w_note"); d.driverName = g("w_driverName"); d.logisticsName = g("w_logisticsName"); }
-      saveDraftState();
+      saveDraftState(); dpProgUpdate();
     }
     function validateStep() {
       const d = draft;
@@ -2311,7 +2334,8 @@ views.release = {
       body.querySelectorAll("[data-light]").forEach(im => im.addEventListener("click", () => { const lb = $("#dpLight"); lb.querySelector("img").src = im.dataset.light; lb.classList.remove("hide"); }));
       if (mode === "wizard") {
         initChips(body); initSwitches(body);
-        body.querySelectorAll("input, select, textarea").forEach(el => el.addEventListener("change", readStep));
+        body.querySelectorAll("input, select, textarea").forEach(el => { el.addEventListener("change", readStep); el.addEventListener("input", readStep); });
+        body.addEventListener("click", () => setTimeout(() => { if (draft && mode === "wizard") readStep(); }, 0)); // ชิปตัวเลือก / สวิตช์ ไม่ยิง change
         $("#w_cancel").addEventListener("click", async () => { if (step > 0) { readStep(); step--; renderMain(); return; } if (await ask("ยกเลิกการบันทึก", "ร่างนี้จะถูกลบและกู้คืนไม่ได้")) { draft = null; editUid = null; saveDraftState(); mode = "empty"; renderEntry(); } });
         $("#w_saveExit").addEventListener("click", () => { readStep(); toast("💾 บันทึกร่างไว้แล้ว"); draft = null; mode = "empty"; renderEntry(); });
         $("#w_delete")?.addEventListener("click", async () => { if (!editUid) return; if (!await ask("ลบบันทึก", "ลบใบบันทึกนี้ถาวร?")) return; dpSave(dpRecs().filter(x => x.uid !== editUid)); dpQueuePush({ action: "deleteDispatch", uid: editUid }); dpFlush(); draft = null; step = 0; editUid = null; cur = null; mode = "empty"; saveDraftState(); showTab("status"); renderMain(); renderEntry(); toast("ลบบันทึกแล้ว"); });
