@@ -2537,7 +2537,7 @@ views.coa = {
       <div class="section-title"><h2>ใบ COA</h2><span class="hint" id="c_count"></span></div>
       <div class="coa-top"><form class="search sm" onsubmit="return false">${ICON.lens}<input id="c_q" type="search" placeholder="เลขที่ใบ ลูกค้า รถ หรือ Lot" autocomplete="off"></form>${(OPEN_ACCESS || coaRole() === "sales" || coaRole() === "admin") ? `<button class="btn sm" id="c_new" type="button">+ เพิ่ม COA</button>` : ""}</div>
       <div class="coa-hist coa-list" id="c_list"></div>
-      <div class="row" style="margin-top:8px"><button class="btn sm ghost" id="c_reload" type="button">โหลดจากชีต</button><span class="muted" id="c_sync" style="font-size:12.5px"></span></div>
+      <div class="row" style="margin-top:8px"><button class="btn sm ghost" id="c_reload" type="button">โหลดจากชีต</button><button class="btn sm ghost danger" id="c_wipe" type="button" title="ลบใบ COA ที่เก็บในเครื่องนี้ แล้วโหลดใหม่จากชีต">🗑 ล้างข้อมูลในเครื่อง</button><span class="muted" id="c_sync" style="font-size:12.5px"></span></div>
       <div id="c_editor"></div>
     </div></section>
     <section class="panel doc"><div class="sheet-wrap"><article class="sheet coa-sheet" id="c_sheet"></article></div><div class="sheet-actions"><button class="btn ghost" id="c_full" type="button">⛶ ดูเต็มจอ</button><button class="btn ghost" id="c_print" type="button">🖨 พิมพ์ / PDF</button><button class="btn ghost danger hide" id="c_cancel" type="button">ยกเลิกใบ COA</button></div></section>
@@ -2796,6 +2796,12 @@ views.coa = {
     $("#c_list").addEventListener("click", e => { const c = e.target.closest("[data-no]"); if (!c) return; if (cur && cur.status === "new" && c.dataset.no === cur.certNo) return; const r = coaRecs().find(x => x.certNo === c.dataset.no); if (r) { open(r); renderList(); } });
     $("#c_new")?.addEventListener("click", () => { if (!canReq) { toast("ฝ่ายการตลาด (SA01) หรือผู้ดูแลระบบเท่านั้นที่เพิ่มใบ COA ได้"); return; } open(newRec()); renderList(); $("#e_cust").focus(); });
     $("#c_reload").addEventListener("click", async () => { toast("กำลังโหลด…"); const ok = await coaRefresh(); toast(ok ? "<b>โหลดจากชีตแล้ว</b>" : "<b>โหลดไม่ได้</b>"); if (cur && cur.status !== "new") { const r = coaRecs().find(x => x.certNo === cur.certNo); if (r) open(r); } renderList(); });
+    $("#c_wipe").addEventListener("click", async () => {
+      const n = coaRecs().length, q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]").length;
+      if (!confirm(`ล้างข้อมูลใบ COA ในเครื่องนี้ ${n} ใบ${q ? ` (มี ${q} รายการที่ยังไม่ได้ซิงค์ขึ้นชีต จะหายไปด้วย)` : ""} แล้วโหลดใหม่จากชีต?`)) return;
+      localStorage.removeItem(COA_KEY.recs); localStorage.removeItem(COA_KEY.queue); cur = null; p1edit = false; renderEditor(); renderPaper(); renderList();
+      const ok = await coaRefresh(); renderEditor(); renderPaper(); renderList(); toast(`<b>ล้างข้อมูลในเครื่องแล้ว</b>${ok ? ` · โหลดจากชีต ${coaRecs().length} ใบ` : " · ยังโหลดจากชีตไม่ได้"}`, 3000);
+    });
     $("#c_print").addEventListener("click", () => window.print());
     $("#c_full")?.addEventListener("click", () => {
       const sheet = $("#c_sheet"); if (!sheet || !sheet.innerHTML.trim()) { toast("เลือกใบ COA ก่อน"); return; }
@@ -2824,7 +2830,7 @@ views.coa = {
 
     /* start */
     renderPaper(); renderList();
-    const boot = () => { if (cur) { if (cur.status !== "new") { const r = coaRecs().find(x => x.certNo === cur.certNo); if (r) open(r); else { renderEditor(); renderPaper(); } } else { renderEditor(); renderPaper(); } } else { const want = params.get("no") && coaRecs().find(x => x.certNo === params.get("no")); const l = want || coaRecs().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0]; if (l) open(l); else if (canReq) open(newRec()); } renderList(); };
+    const boot = () => { if (cur) { if (cur.status !== "new") { const r = coaRecs().find(x => x.certNo === cur.certNo); if (r) open(r); else { renderEditor(); renderPaper(); } } else { renderEditor(); renderPaper(); } } else { const want = params.get("no") && coaRecs().find(x => x.certNo === params.get("no")); const l = want || coaRecs().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0]; if (l) open(l); else { cur = null; renderEditor(); renderPaper(); } } renderList(); }; // ไม่สร้างใบเปล่าอัตโนมัติ — กด + เพิ่ม COA เอง
     loadQuality(false).then(boot); coaRefresh().then(() => { boot(); if (tab === "dash") renderDash(); }); coaFlush();
     if (params.get("tab") === "dash") showTab("dash");
   },
