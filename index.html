@@ -917,7 +917,7 @@ body[data-view="coa"] .panel.doc { border: 1px solid var(--line); }
 .coa-truck.nod { background: #fdecec; }
 .coa-sync { margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--mango-deep, #c77700); } .coa-sync.bad { color: var(--bad); }
 .coa-syncbar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 12px; border-radius: 14px; background: #fff6e5; border: 1.5px solid #ffd58a; } .coa-syncbar.bad { background: #fdecec; border-color: #f3b4b7; }
-.coa-syncbar > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; } .coa-syncbar b { font-size: 14px; } .coa-syncbar small { color: var(--ink-2); }
+.coa-syncbar > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; } .coa-syncbar > div.row { flex: 0 0 auto; flex-direction: row; flex-wrap: wrap; gap: 6px; } .coa-syncbar b { font-size: 14px; } .coa-syncbar small { color: var(--ink-2); }
 .coa-truck .rm { border: 0; background: transparent; cursor: pointer; font-size: 16px; line-height: 1; color: var(--muted); padding: 0 2px; }
 .cf-tab { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .cf-tab th, .cf-tab td { border: 1px solid #000; padding: 4px 4px; text-align: center; font-size: 14.5px; height: 26px; overflow: hidden; }
@@ -1170,7 +1170,8 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;"
   addEventListener("hashchange", close);
 })();
 const lotByNo = no => LOTS.find(l => l.no === no);
-const getUser = () => JSON.parse(localStorage.getItem("qc.user") || "null") || { name: "สุรศักดิ์", role: "QC" };
+// ผู้ใช้ปัจจุบันยึดตามเซสชันของแท็บนี้ก่อน (qc.user ใช้ร่วมกันทุกแท็บ อาจเป็นคนละคนกับ token ที่แท็บนี้ถือ)
+const getUser = () => { const s = getSession(); if (s && s.name) return { name: s.name, role: s.role }; return JSON.parse(localStorage.getItem("qc.user") || "null") || { name: "สุรศักดิ์", role: "QC" }; };
 // รายชื่อผู้ใช้ (ไม่มีรหัสผ่าน) — ใช้แสดงชื่อ / ไอคอน / รายชื่อผู้อนุมัติ / ลายเซ็น ; การล็อกอินและสิทธิ์ตรวจที่เซิร์ฟเวอร์ (Cloudflare D1)
 const USERS = [
   { user: "wh01",  name: "พนักงานคลังสินค้า",          role: "คลังสินค้า" },
@@ -1593,12 +1594,16 @@ async function loadQuality(force) {
     const j = await apiFetch(apiUrl() + "?action=getQuality&_=" + Date.now()).then(r => r.json());
     if (!j.ok) throw new Error(j.error || "โหลดข้อมูลไม่ได้");
     Object.assign(Q, { rows: j.rows.map(fromDbRow), specs: j.specs.map(fromDbSpec), at: Date.now(), from: "live", error: null });
-    localStorage.setItem("qc.quality", JSON.stringify({ rows: Q.rows, specs: Q.specs, at: Q.at }));
+    try { localStorage.setItem("qc.quality", JSON.stringify({ rows: Q.rows, specs: Q.specs, at: Q.at })); } catch (e) { /* พื้นที่ในเครื่องเต็ม: ข้อมูลโหลดมาแล้ว ใช้ต่อได้ แค่ไม่เก็บสำรอง */ }
   } catch (e) {
     if (cached && cached.specs) Object.assign(Q, cached, { from: "stale", error: e.message }); else Object.assign(Q, { rows: null, specs: null, error: e.message });
   }
   applyEdits(); return Q;
 }
+// เลข Strike บางเลขซ้ำกันข้ามฤดู (เช่น 327): เวลาอ้างด้วยเลขอย่างเดียว ใช้แถวที่ผลิตล่าสุด
+const lotKey = r => r._k || r.strike;
+const lotHits = no => (Q.rows || []).filter(r => r.strike === String(no));
+const strikeRow = no => { const h = lotHits(no); return h.length < 2 ? h[0] : h.reduce((a, b) => String(b.dk || "") > String(a.dk || "") ? b : a); };
 const fmtN = (v, d) => v === null || v === undefined ? "—" : d === 0 ? fmtInt(v) : fmt(v, d);
 const timeAgo = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "เมื่อสักครู่" : m < 60 ? `${m} นาทีที่แล้ว` : `${Math.round(m / 60)} ชม.ที่แล้ว`; };
 
@@ -1704,16 +1709,16 @@ views["find-lot"] = {
     function renderDetail(list) {
       const el = $("#detail");
       if (!Q.rows) { el.innerHTML = Q.error ? empty("โหลดข้อมูลไม่ได้", Q.error, true) : empty("กำลังโหลดข้อมูล…"); $("#retry")?.addEventListener("click", () => load(true)); return; }
-      const r = list.find(x => x.strike === selected);
+      const r = list.find(x => lotKey(x) === selected);
       const banner = custBanner(list);
       if (mode === "cust" && !$("#fCust").value) { el.innerHTML = empty("เลือกลูกค้าเพื่อดู Lot ที่ผ่านเกณฑ์", "ระบบเทียบค่าคุณภาพทุก Lot กับสเปคของลูกค้าใน sheet Spec"); return; }
       if (!r) { el.innerHTML = banner + empty(banner ? "ไม่มี Lot ที่ผ่านเกณฑ์ของลูกค้ารายนี้" : "ไม่พบ Lot ที่ตรงกับเงื่อนไข", banner ? "ลองล้างตัวกรองอื่น หรือเลือกลูกค้ารายอื่น" : "ลองขยายช่วงค่าหรือล้างตัวกรอง"); $("#custClear")?.addEventListener("click", clearCust); return; }
       if (mode === "cust" && !custOpen) { // แท็บค้นหาลูกค้า: แสดงเฉพาะเลข Lot เรียงแนวตั้ง กดเข้าไปดูรายละเอียดเอง
-        el.innerHTML = banner + `<ul class="cust-lots">${list.map(x => `<li><button type="button" data-lot="${esc(x.strike)}"><b>${esc(x.strike)}</b><span class="cl-date">ผลิต ${esc(x.date || "—")}</span><i aria-hidden="true">›</i></button></li>`).join("")}</ul>`;
+        el.innerHTML = banner + `<ul class="cust-lots">${list.map(x => `<li><button type="button" data-lot="${esc(lotKey(x))}"><b>${esc(x.strike)}</b><span class="cl-date">ผลิต ${esc(x.date || "—")}</span><i aria-hidden="true">›</i></button></li>`).join("")}</ul>`;
         $("#custClear")?.addEventListener("click", clearCust); return;
       }
       const strip = banner + (mode === "cust" ? `<button type="button" class="cust-back" id="custBack">‹ กลับรายการ Lot</button>` : `<div class="d-results"><span class="lbl">พบ ${fmtInt(list.length)} Lot</span><div class="strip">${list.slice(0, MAX_CHIPS).map(x =>
-        `<button type="button" class="chip ${x.strike === selected ? "on" : ""} ${QSTATUS[x.status] === "hold" ? "hold" : ""}" data-s="${esc(x.strike)}">${esc(x.strike)}</button>`).join("")}${list.length > MAX_CHIPS ? `<span class="more">…และอีก ${fmtInt(list.length - MAX_CHIPS)} รายการ ค้นหาให้แคบลง</span>` : ""}</div></div>`);
+        `<button type="button" class="chip ${lotKey(x) === selected ? "on" : ""} ${QSTATUS[x.status] === "hold" ? "hold" : ""}" data-s="${esc(lotKey(x))}">${esc(x.strike)}</button>`).join("")}${list.length > MAX_CHIPS ? `<span class="more">…และอีก ${fmtInt(list.length - MAX_CHIPS)} รายการ ค้นหาให้แคบลง</span>` : ""}</div></div>`);
       el.innerHTML = strip + `
         <div class="d-head"><div><small>Strike</small><h2>${esc(r.strike)}</h2></div>${pill(r.status)}</div>
         <div class="d-sub">${esc(r.grade)} · ผลิต ${esc(r.date || "—")} · ฤดู ${esc(r.season || "—")}</div>
@@ -1742,7 +1747,7 @@ views["find-lot"] = {
     function clearCust() { $("#fCust").value = ""; custOpen = false; render(); }
     function render() {
       const list = filtered();
-      if (list.length && !list.some(r => r.strike === selected)) selected = list[0].strike;
+      if (list.length && !list.some(r => lotKey(r) === selected)) selected = lotKey(list[0]);
       renderDetail(list);
     }
     function fillCustomers() {
@@ -1762,10 +1767,10 @@ views["find-lot"] = {
     async function load(force) {
       $("#dataStatus").className = "fl-status busy"; $("#dataText").textContent = "กำลังโหลดข้อมูล…";
       await loadQuality(force); status(); fillCustomers(); fillMonths(root); if (!$("#tabDash").classList.contains("hide")) renderDashboard(root); if (!$("#tabEdit").classList.contains("hide")) renderEditor(root);
-      if (Q.rows && params.get("lot") && Q.rows.some(r => r.strike === params.get("lot"))) selected = params.get("lot");
+      if (Q.rows && params.get("lot") && strikeRow(params.get("lot"))) selected = lotKey(strikeRow(params.get("lot")));
       render();
     }
-    $("#strikeForm").addEventListener("submit", () => { const s = $("#strike").value.trim(); const hit = Q.rows && Q.rows.find(r => r.strike === s); if (hit) selected = hit.strike; render(); if (hit && window.innerWidth < 860) { const d = $("#detail"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" }); } if (!hit && s && Q.rows) toast(`ไม่พบ Strike <b>${esc(s)}</b> แบบตรงตัว แสดงรายการที่ใกล้เคียงแทน`); });
+    $("#strikeForm").addEventListener("submit", () => { const s = $("#strike").value.trim(); const hit = Q.rows && strikeRow(s); if (hit) selected = lotKey(hit); render(); if (hit && window.innerWidth < 860) { const d = $("#detail"); if (d) d.scrollIntoView({ behavior: "smooth", block: "start" }); } if (!hit && s && Q.rows) toast(`ไม่พบ Strike <b>${esc(s)}</b> แบบตรงตัว แสดงรายการที่ใกล้เคียงแทน`); });
     $("#strike").addEventListener("input", render);
     ["#cMin", "#cMax", "#mMin", "#mMax"].forEach(s => $(s).addEventListener("input", render));
     ["#fGrade", "#fStatus"].forEach(s => $(s).addEventListener("change", render)); $("#fCust").addEventListener("change", () => { custOpen = false; render(); });
@@ -2081,9 +2086,13 @@ const OPEN_ACCESS = false; // บังคับสิทธิ์ตามบ�
 const dpRole = () => { if (OPEN_ACCESS) return "admin"; const r = getUser().role || ""; return r === "QA" ? "checker" : r === "ผู้อนุมัติ" ? "approver" : r === "ผู้ดูแลระบบ" ? "admin" : "recorder"; };
 const dpKey = { recs: "qc.dispatch", draft: "qc.dispatch.draft", queue: "qc.dispatch.queue" };
 const dpRecs = () => JSON.parse(localStorage.getItem(dpKey.recs) || "[]");
-const dpSave = recs => localStorage.setItem(dpKey.recs, JSON.stringify(recs));
+// รูปถ่ายไม่เก็บซ้ำในรายการ (พื้นที่เบราว์เซอร์มีจำกัด ~5MB): รูปรอส่งอยู่ในคิว ส่งแล้วเปิดจากเซิร์ฟเวอร์ผ่าน photoUrls
+const dpSave = recs => safeSet(dpKey.recs, JSON.stringify(recs.map(r => { if (!r.photos) return r; const { photos, ...rest } = r; return rest; })));
 const dpQueue = () => JSON.parse(localStorage.getItem(dpKey.queue) || "[]");
-const dpQueuePush = p => { const q = dpQueue(); q.push(p); localStorage.setItem(dpKey.queue, JSON.stringify(q)); };
+// เขียนลงเครื่อง: ถ้าพื้นที่เต็ม ทิ้งสำเนา Lot (โหลดใหม่ได้) แล้วลองอีกครั้ง · false = เขียนไม่ได้จริงๆ
+const safeSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch (e) { try { localStorage.removeItem("qc.quality"); localStorage.setItem(k, v); return true; } catch (e2) { toast("<b>พื้นที่ในเครื่องเต็ม</b> รูปหรือข้อมูลล่าสุดยังไม่ถูกเก็บ · เชื่อมเน็ตเพื่อส่งงานที่ค้างก่อน", 5000); return false; } } };
+const qOwner = () => (getSession() || {}).user || "";
+const dpQueuePush = p => { const q = dpQueue(); q.push({ ...p, by: qOwner(), qid: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }); return safeSet(dpKey.queue, JSON.stringify(q)); };
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const isoToDmy = v => v ? `${v.slice(8, 10)}/${v.slice(5, 7)}/${v.slice(0, 4)}` : "—";
 const fmtTs = t => { const d = new Date(t); const p = n => String(n).padStart(2, "0"); return isNaN(d) ? "" : `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -2097,7 +2106,7 @@ function dpProgress(d) {
   const lots = d.lots || []; const cont = d.truckType === "รถตู้คอนเทนเนอร์ (Container)";
   const steps = [
     [!!d.date, seasonOk(d.prodYear), !!d.timeStart, !!d.plate, !!d.customer, !!d.truckType],
-    [...dpChecksFor(d).map(c => !!(d.checks && d.checks[c.id])), (d.photos || []).length > 0],
+    [...dpChecksFor(d).map(c => !!(d.checks && d.checks[c.id])), (d.photos || []).length + (d.photoUrls || []).length > 0],
     [!!d.sugarType, !!d.pack, !!d.bay, lots.length > 0 && lots.every(l => l.no && +l.bags > 0)],
     [!!d.tarp, ...(cont ? [!!d.seal] : []), !!d.timeEnd, !!d.driverName, !!d.logisticsName],
   ];
@@ -2108,7 +2117,7 @@ function dpProgress(d) {
 // ปีการผลิต/ฤดู รูปแบบ YY/YY (เช่น 25/26): รับเฉพาะตัวเลข 4 หลัก ใส่ / ให้อัตโนมัติ
 const fmtSeason = v => { const d = String(v || "").replace(/\D/g, "").slice(0, 4); return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d; };
 const seasonOk = v => { const m = String(v || "").match(/^(\d{2})\/(\d{2})$/); return !!m && +m[2] === (+m[1] + 1) % 100; };
-const currentSeason = () => { const y = new Date().getFullYear(); const p = n => String(n % 100).padStart(2, "0"); return `${p(y - 1)} ${p(y)}`; };
+const currentSeason = () => { const n = new Date(); const y = n.getFullYear() + (n.getMonth() === 11 ? 1 : 0); /* ฤดูใหม่เริ่มเดือนธันวาคม */ const p = n => String(n % 100).padStart(2, "0"); return `${p(y - 1)} ${p(y)}`; };
 function dpNewDraft() {
   const u = getUser(); const recs = dpRecs();
   return { id: recs.reduce((m, r) => Math.max(m, +r.id || 0), 0) + 1, uid: "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
@@ -2122,19 +2131,28 @@ function dpUpsert(rec) { const recs = dpRecs(); const i = recs.findIndex(r => r.
 function dpSlim(rec) { const r = { ...rec }; delete r.photos; return r; }
 function dpPush(rec) { dpQueuePush({ action: "saveDispatch", record: dpSlim(rec) }); dpFlush(); }
 let dpFlushing = false;
+const dpItemUid = p => (p.record && p.record.uid) || p.uid;
+// สถานะการส่งของใบนี้: null = ส่งครบแล้ว · pending = รอส่ง · failed = เซิร์ฟเวอร์ปฏิเสธ (ยังเก็บไว้ ไม่ทิ้งเงียบ)
+const dpSyncState = uid => { const q = dpQueue().filter(p => dpItemUid(p) === uid); return !q.length ? null : q.some(p => p.error) ? { failed: true, error: q.find(p => p.error).error } : { pending: true }; };
+function dpRetry(uid) { safeSet(dpKey.queue, JSON.stringify(dpQueue().map(p => dpItemUid(p) === uid ? { ...p, error: undefined } : p))); return dpFlush(); }
+function dpDiscard(uid) { safeSet(dpKey.queue, JSON.stringify(dpQueue().filter(p => dpItemUid(p) !== uid))); return dpRefresh(); }
 async function dpFlush() {
-  if (dpFlushing || !navigator.onLine) return; const url = apiUrl(); if (!url) return;
+  if (dpFlushing || !navigator.onLine || !getSession()) return; const url = apiUrl(); if (!url) return;
   dpFlushing = true;
   try {
     // re-read the queue from storage each step so items appended during a POST (เช่น รูปที่ต่อท้ายหลัง saveDispatch) ไม่ถูกเขียนทับหาย
+    // ส่งเฉพาะรายการของผู้ใช้ที่ล็อกอินอยู่ (เครื่องที่ใช้ร่วมกัน: รายการของคนอื่นรอให้เจ้าของล็อกอินเอง)
     while (true) {
-      const q = dpQueue(); if (!q.length) break;
-      const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(q[0]) }); const res = await http.json();
+      const item = dpQueue().find(p => !p.error && (!p.by || p.by === qOwner())); if (!item) break;
+      const { error, by, qid, ...payload } = item;
+      const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }); const res = await http.json();
+      const same = p => p.qid ? p.qid === item.qid : JSON.stringify(p) === JSON.stringify(item);
       if (!res.ok) {
         if (http.status !== 400 && http.status !== 403) throw new Error(res.error || "sync failed"); // เน็ต/เซิร์ฟเวอร์มีปัญหา หรือหมดเซสชัน → เก็บไว้ส่งใหม่
-        toast(`<b>เซิร์ฟเวอร์ไม่รับรายการนี้</b> ${esc(res.error || "")}`, 4000); // ถูกปฏิเสธ (ไม่มีสิทธิ์/ข้อมูลผิด) → ตัดออกจากคิว ไม่ให้ค้าง
+        const q2 = dpQueue(); const k = q2.findIndex(same); if (k >= 0) { q2[k].error = res.error || "เซิร์ฟเวอร์ไม่รับ"; safeSet(dpKey.queue, JSON.stringify(q2)); }
+        toast(`<b>บันทึกจ่ายออกส่งไม่สำเร็จ</b> ${esc(res.error || "")} · งานยังอยู่ในเครื่อง เปิดใบนั้นเพื่อส่งใหม่`, 5000); continue;
       }
-      const q2 = dpQueue(); q2.shift(); localStorage.setItem(dpKey.queue, JSON.stringify(q2));
+      const q2 = dpQueue(); const k = q2.findIndex(same); if (k >= 0) { q2.splice(k, 1); safeSet(dpKey.queue, JSON.stringify(q2)); }
     }
   } catch (e) { /* keep queue, retry later */ } finally { dpFlushing = false; document.dispatchEvent(new CustomEvent("qc:dispatch")); }
 }
@@ -2146,7 +2164,7 @@ async function dpRefresh() {
     const pendingUids = new Set(dpQueue().filter(p => p.action === "saveDispatch").map(p => p.record.uid));
     const delUids = new Set(dpQueue().filter(p => p.action === "deleteDispatch").map(p => p.uid));
     const local = dpRecs(); const byUid = {}; local.forEach(r => byUid[r.uid] = r);
-    const merged = j.records.filter(r => !delUids.has(r.uid)).map(r => { const l = byUid[r.uid]; if (l && pendingUids.has(r.uid)) return l; if (l && l.photos && l.photos.length) r.photos = l.photos; return r; });
+    const merged = j.records.filter(r => !delUids.has(r.uid)).map(r => { const l = byUid[r.uid]; if (l && pendingUids.has(r.uid)) return l; return r; });
     const remoteUids = new Set(j.records.map(r => r.uid));
     local.forEach(r => { if (!remoteUids.has(r.uid) && (pendingUids.has(r.uid) || r.status === "draft")) merged.push(r); });
     dpSave(merged); return true;
@@ -2272,10 +2290,11 @@ views.release = {
     // ร่างที่ถูกลบจะถูกจำ uid ไว้ เพื่อไม่ให้แท็บอื่น/หน้าจอเดิมที่ยังเปิดฟอร์มค้างไว้เขียนร่างนั้นกลับขึ้นมาอีก
     const DRAFT_DEL_KEY = "qc.dispatch.draftDeleted";
     const deletedDrafts = () => { try { return JSON.parse(localStorage.getItem(DRAFT_DEL_KEY) || "[]"); } catch (e) { return []; } };
-    const readSaved = () => { try { return JSON.parse(localStorage.getItem(dpKey.draft) || "null"); } catch (e) { return null; } };
+    // ร่างเก็บในเครื่อง: เครื่องที่ใช้ร่วมกันจะไม่เห็นร่างของคนอื่น (ส่งไปก็ถูกปฏิเสธเพราะไม่ใช่เจ้าของ)
+    const readSaved = () => { try { const s = JSON.parse(localStorage.getItem(dpKey.draft) || "null"); const by = s && s.draft && s.draft.recordedBy; return by && role !== "admin" && !(by.username === myUser || by.name === me.name) ? null : s; } catch (e) { return null; } };
     const saveDraftState = () => {
       if (draft && !editUid && deletedDrafts().includes(draft.uid)) { draft = null; mode = "empty"; } // ร่างนี้ถูกลบไปแล้ว ห้ามบันทึกซ้ำ
-      if (draft) localStorage.setItem(dpKey.draft, JSON.stringify({ draft, step, editUid })); else localStorage.removeItem(dpKey.draft);
+      if (draft) safeSet(dpKey.draft, JSON.stringify({ draft, step, editUid })); else localStorage.removeItem(dpKey.draft);
       saved = readSaved();
     };
     // ลบร่างที่เขียนค้างไว้ (เก็บในเครื่องเท่านั้น ยังไม่ได้ส่งขึ้นชีต)
@@ -2323,19 +2342,20 @@ views.release = {
         <button type="button" class="dp-card ${cur && cur.uid === r.uid && mode === "detail" ? "on" : ""} ${tasks.includes(r) ? "task" : ""}" data-uid="${r.uid}">
           <div class="l1"><b>${esc(r.plate || "—")}</b>${pill(r.status)}</div>
           <div class="l2">${esc(r.customer || "—")} · ${esc(r.sugarType || "—")}</div>
+          ${(() => { const s = dpSyncState(r.uid); return s ? `<div class="coa-sync ${s.failed ? "bad" : ""}">${s.failed ? "⚠ ส่งขึ้นระบบไม่สำเร็จ" : "⏳ รอส่งขึ้นระบบ"}</div>` : ""; })()}
           <div class="l3"><span>${fmt(+r.tons || 0, 1)} ตัน · ${(r.lots || []).length} Lot</span>${r.coa ? '<span class="coa">COA</span>' : ""}<span class="muted">${esc(r.recordedBy?.name || "")}</span></div>
         </button>`).join("")).join("");
       $("#dpCards").innerHTML = html || `<div class="d-empty" style="padding:20px"><img src="assets/mascot.png" alt=""><b>ยังไม่มีบันทึก</b><span>${role === "recorder" ? "กด + บันทึกใหม่ เพื่อเริ่ม" : ""}</span></div>`;
       $("#dpResume")?.addEventListener("click", () => { draft = saved.draft; step = saved.step; editUid = saved.editUid; mode = "wizard"; showTab("entry"); renderEntry(); });
       $("#dpDraftDel")?.addEventListener("click", deleteSavedDraft);
-      const qn = dpQueue().length; $("#dpSync").innerHTML = !apiUrl() ? `<span class="dot off"></span>ยังไม่เชื่อมฐานข้อมูล` : qn ? `<span class="dot wait"></span>รอส่งขึ้นฐานข้อมูล ${qn} รายการ` : `<span class="dot ok"></span>ซิงค์กับฐานข้อมูลแล้ว`;
+      const myQ = dpQueue().filter(p => !p.by || p.by === qOwner()); const qn = myQ.filter(p => !p.error).length, qf = myQ.filter(p => p.error).length; $("#dpSync").innerHTML = !apiUrl() ? `<span class="dot off"></span>ยังไม่เชื่อมฐานข้อมูล` : qf ? `<span class="dot off"></span>⚠ ส่งไม่สำเร็จ ${qf} รายการ · เปิดใบที่มีป้าย ⚠ เพื่อจัดการ` : qn ? `<span class="dot wait"></span>รอส่งขึ้นฐานข้อมูล ${qn} รายการ` : `<span class="dot ok"></span>ซิงค์กับฐานข้อมูลแล้ว`;
     }
 
     /* ---- right column: empty / wizard / confirm / detail ---- */
     function renderMain() {
       if (mode === "wizard" || mode === "confirm") { renderEntry(); return; }
       const body = $("#dpBody");
-      if (mode === "detail" && cur) body.innerHTML = detailHtml(cur);
+      if (mode === "detail" && cur) { body.innerHTML = detailHtml(cur); const no = $("#dpNo"); if (no) no.textContent = "#" + String(cur.id || 0).padStart(4, "0"); }
       else body.innerHTML = `<div class="d-empty" style="padding:60px 10px"><img src="assets/mascot.png" alt=""><b>เลือกบันทึกจากรายการ</b><span>ขั้นตอน: ผู้บันทึก (QC) ส่งตรวจ → ผู้ตรวจสอบ (QA) → ผู้อนุมัติ</span></div>`;
       bindMain(); renderList();
       if (innerWidth <= 900 && mode === "detail" && tab === "status") $("#dpMain").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2380,7 +2400,7 @@ views.release = {
         <div class="dp-checks">${dpChecksFor(d).map(c => `<div class="ck"><span>${c.name}</span><div class="seg"><button type="button" class="${d.checks[c.id] === "a" ? (c.neutral ? "n" : "ok") : ""}" data-ck="${c.id}" data-v="a">${c.a}</button><button type="button" class="${d.checks[c.id] === "b" ? (c.neutral ? "n" : "bad") : ""}" data-ck="${c.id}" data-v="b">${c.b}</button></div></div>`).join("")}</div>
         ${field("อื่นๆ (ระบุ) — ไม่บังคับ", `<input class="input" id="w_otherNote" value="${esc(d.otherNote || "")}" placeholder="บันทึกเพิ่มเติมเกี่ยวกับสภาพรถ">`)}
         <h3 class="dp-h">รูปภาพสภาพรถ <span class="req"></span></h3>
-        <div class="dp-photos" id="dpPhotos">${(d.photos || []).map((p, i) => `<div class="ph"><img src="${p}" alt=""><button type="button" data-rm="${i}" aria-label="ลบรูป">×</button></div>`).join("")}<label class="ph add">${ICON.camera}<span>ถ่ายรูป / แนบรูปสภาพรถ</span><input type="file" accept="image/*" capture="environment" id="w_photo" hidden></label></div>`;
+        <div class="dp-photos" id="dpPhotos">${(d.photoUrls || []).map(p => `<div class="ph"><img src="${esc(p)}" alt="รูปที่ส่งแล้ว"></div>`).join("")}${(d.photos || []).map((p, i) => `<div class="ph"><img src="${p}" alt=""><button type="button" data-rm="${i}" aria-label="ลบรูป">×</button></div>`).join("")}<label class="ph add">${ICON.camera}<span>ถ่ายรูป / แนบรูปสภาพรถ</span><input type="file" accept="image/*" capture="environment" id="w_photo" hidden></label></div>`;
       if (step === 2) inner = `
         <h3 class="dp-h">2. สภาพน้ำตาล</h3>
         <div class="fgrid">${field("ชนิดน้ำตาล", `<select class="select" id="w_sugarType"><option value="">— เลือก —</option>${DP.SUGAR.map(o => `<option ${o === d.sugarType ? "selected" : ""}>${o}</option>`).join("")}</select>`, true)}${field("ขนาดบรรจุ", `<select class="select" id="w_pack"><option value="">— เลือก —</option>${DP.PACK.map(o => `<option ${o === d.pack ? "selected" : ""}>${o}</option>`).join("")}</select>`, true)}${field("จำนวนบรรทุก คำนวณอัตโนมัติ", `<input class="input tons" id="w_tons" value="${fmt(dpTons(d), 3)} ตัน" readonly>`)}</div>
@@ -2423,7 +2443,7 @@ views.release = {
         <div class="d-groups">
           <div>
             <div class="d-group"><h3>ข้อมูลทั่วไป</h3><div class="facts one">${row("วันที่", isoToDmy(d.date))}${row("ทะเบียนรถ", esc(d.plate))}${row("ประเภทรถ", esc(d.truckType))}${row("บริษัทขนส่ง", esc(d.transport))}${row("ลูกค้าปลายทาง", esc(d.customer))}${row("ปีการผลิต", esc(fmtSeason(d.prodYear)))}${row("เวลาขึ้น", `${esc(d.timeStart || "—")} → ${esc(d.timeEnd || "—")}`)}${row("ใบ COA", d.coa ? "✓ ขอ" : "ไม่ขอ")}</div></div>
-            <div class="d-group"><h3>1. สภาพรถก่อนโหลด</h3>${fails.length ? `<div class="facts one">${fails.map(c => row(c.name, `<span class="bad">✕ ${c.b}</span>`)).join("")}</div>` : `<div class="okline">✓ ผ่านทุกรายการ (${dpChecksFor(d).length})</div>`}${d.otherNote ? `<div class="facts one">${row("อื่นๆ", esc(d.otherNote))}</div>` : ""}${(d.photos || []).length || (d.photoUrls || []).length ? `<div class="dp-thumbs">${(d.photos && d.photos.length ? d.photos : d.photoUrls).map(p => `<img src="${p}" alt="" data-light="${p}">`).join("")}</div>` : ""}</div>
+            <div class="d-group"><h3>1. สภาพรถก่อนโหลด</h3>${fails.length ? `<div class="facts one">${fails.map(c => row(c.name, `<span class="bad">✕ ${c.b}</span>`)).join("")}</div>` : `<div class="okline">✓ ผ่านทุกรายการ (${dpChecksFor(d).length})</div>`}${d.otherNote ? `<div class="facts one">${row("อื่นๆ", esc(d.otherNote))}</div>` : ""}${(d.photos || []).length || (d.photoUrls || []).length ? `<div class="dp-thumbs">${[...(d.photoUrls || []), ...(d.photos || [])].map(p => `<img src="${esc(p)}" alt="" data-light="${esc(p)}">`).join("")}</div>` : ""}</div>
           </div>
           <div>
             <div class="d-group"><h3>2. สภาพน้ำตาล</h3><div class="facts one">${row("ชนิด", esc(d.sugarType))}${row("ขนาดบรรจุ", esc(d.pack))}${row("จำนวนบรรทุก", `${fmt(+d.tons || 0, 3)} ตัน`)}${row("คลัง", esc(d.bay))}${row("รวม", `${(d.lots || []).length} Lot · ${fmtInt(dpBags(d))} กระสอบ`)}</div>
@@ -2435,7 +2455,9 @@ views.release = {
     function confirmHtml() { return `<div class="dp-wiz-head"><div><small>ตรวจทานก่อนส่ง</small><h2>สรุปข้อมูลการส่งมอบ</h2></div></div>${summaryHtml(draft)}<div class="dp-wiz-foot"><button type="button" class="btn ghost" id="c_back">‹ กลับไปแก้ไข</button><button type="button" class="btn" id="c_submit">✓ ยืนยันและส่งตรวจสอบ</button></div>`; }
     function detailHtml(r) {
       const sig = (id, txt, on) => `<div class="sig ${on ? "on" : ""}"><small>${DP.SIGS.find(s => s[0] === id)[1]}</small><b>${on ? "✓ " : ""}${esc(txt || (on ? "ลงนามแล้ว" : "ยังไม่ระบุ"))}</b></div>`;
-      const banner = r.status === "returned" && r.returnNote ? `<div class="dp-banner">↩ ผู้ตรวจสอบส่งกลับแก้ไข: ${esc(r.returnNote)}</div>` : r.status === "rejected" && r.rejectNote ? `<div class="dp-banner">↩ ผู้อนุมัติไม่ผ่าน: ${esc(r.rejectNote)}</div>` : "";
+      const ss = dpSyncState(r.uid);
+      const syncBar = !ss ? "" : ss.failed ? `<div class="coa-syncbar bad"><div><b>⚠ การเปลี่ยนแปลงล่าสุดยังไม่ได้บันทึกขึ้นระบบ</b><span>เซิร์ฟเวอร์ปฏิเสธ: ${esc(ss.error)}</span><small>ผู้อื่นยังไม่เห็นการเปลี่ยนแปลงนี้ · ถ้ามีคนดำเนินการใบนี้ไปแล้ว ให้กดใช้ข้อมูลล่าสุด</small></div><div class="row"><button type="button" class="btn sm" id="a_retry">ส่งอีกครั้ง</button><button type="button" class="btn sm ghost" id="a_syncDrop">ใช้ข้อมูลล่าสุดจากระบบ</button></div></div>` : `<div class="coa-syncbar"><div><b>⏳ รอส่งขึ้นระบบ</b><span>จะส่งเองเมื่อออนไลน์ · ผู้อื่นยังไม่เห็น</span></div><button type="button" class="btn sm ghost" id="a_retry">ส่งตอนนี้</button></div>`;
+      const banner = syncBar + (r.status === "returned" && r.returnNote ? `<div class="dp-banner">↩ ผู้ตรวจสอบส่งกลับแก้ไข: ${esc(r.returnNote)}</div>` : r.status === "rejected" && r.rejectNote ? `<div class="dp-banner">↩ ผู้อนุมัติไม่ผ่าน: ${esc(r.rejectNote)}</div>` : "");
       const acts = [];
       if (canEdit(r)) acts.push(`<button type="button" class="btn ghost" id="a_edit">✎ แก้ไข${r.status === "returned" ? "และส่งคืน" : ""}</button>`);
       if (canCheck(r)) acts.push(`<button type="button" class="btn ghost" id="a_return">✕ ส่งกลับแก้ไข</button><button type="button" class="btn" id="a_check">✓ ผ่านตรวจสอบ</button>`);
@@ -2470,8 +2492,8 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
     function validateStep() {
       const d = draft;
       if (step === 0) { if (!d.date) return "กรุณาเลือกวันที่"; if (!/^\d{2}\/\d{2}$/.test(d.prodYear || "")) return "กรอกปีการผลิต / ฤดู ให้ครบ 4 หลัก เช่น 25/26"; if (!seasonOk(d.prodYear)) return "ปีการผลิต / ฤดู ต้องเป็นปีติดกัน เช่น 25/26"; if (!d.timeStart) return "กรุณาระบุเวลาเริ่มขึ้นน้ำตาล"; if (!d.plate) return "กรุณากรอกทะเบียนรถ"; if (!d.customer) return "กรุณากรอกลูกค้าปลายทาง"; if (!d.truckType) return "กรุณาเลือกประเภทรถบรรทุก"; }
-      if (step === 1) { const miss = dpChecksFor(d).filter(c => !d.checks[c.id]); if (miss.length) return `ยังไม่ได้ตรวจ: ${miss[0].name} (เหลือ ${miss.length} รายการ)`; if (!(d.photos || []).length) return "กรุณาแนบรูปสภาพรถอย่างน้อย 1 รูป"; }
-      if (step === 2) { if (!d.sugarType) return "กรุณาเลือกชนิดน้ำตาล"; if (!d.pack) return "กรุณาเลือกขนาดบรรจุ"; if (!d.bay) return "กรุณาเลือกคลังที่ขึ้นน้ำตาล"; if (!d.lots.length) return "กรุณาเพิ่มอย่างน้อย 1 Lot"; const bad = d.lots.findIndex(l => !l.no || !(+l.bags > 0)); if (bad >= 0) return `Lot ที่ ${bad + 1} ยังไม่ครบ (เลือก Lot / จำนวนกระสอบ)`; const notInDb = d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน")); if (notInDb >= 0) return `Lot ที่ ${notInDb + 1} (${esc(d.lots[notInDb].no)}) ไม่มีในฐานข้อมูลหรือไม่ผ่าน จ่ายออกไม่ได้`; if (!(dpTons(d) > 0)) return "จำนวนบรรทุกต้องมากกว่า 0 ตัน"; }
+      if (step === 1) { const miss = dpChecksFor(d).filter(c => !d.checks[c.id]); if (miss.length) return `ยังไม่ได้ตรวจ: ${miss[0].name} (เหลือ ${miss.length} รายการ)`; if (!(d.photos || []).length && !(d.photoUrls || []).length) return "กรุณาแนบรูปสภาพรถอย่างน้อย 1 รูป"; }
+      if (step === 2) { if (!d.sugarType) return "กรุณาเลือกชนิดน้ำตาล"; if (!d.pack) return "กรุณาเลือกขนาดบรรจุ"; if (!d.bay) return "กรุณาเลือกคลังที่ขึ้นน้ำตาล"; if (!d.lots.length) return "กรุณาเพิ่มอย่างน้อย 1 Lot"; const bad = d.lots.findIndex(l => !l.no || !(+l.bags > 0)); if (bad >= 0) return `Lot ที่ ${bad + 1} ยังไม่ครบ (เลือก Lot / จำนวนกระสอบ)`; const notInDb = d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน")); if (notInDb >= 0) return `Lot ที่ ${notInDb + 1} (${esc(d.lots[notInDb].no)}) ไม่มีในฐานข้อมูลหรือไม่ผ่าน จ่ายออกไม่ได้`; { const g = gradeOfSugar(d.sugarType); const wrong = g ? d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน" && (r.grade === g || !r.grade))) : -1; if (wrong >= 0) return `Lot ที่ ${wrong + 1} (${esc(d.lots[wrong].no)}) ไม่ใช่น้ำตาล ${esc(g)} ตามชนิดที่เลือก`; } if (!(dpTons(d) > 0)) return "จำนวนบรรทุกต้องมากกว่า 0 ตัน"; }
       if (step === 3) { if (!d.tarp) return "กรุณาเลือกสถานะการปกผ้าใบ / Seal"; if (d.truckType === "รถตู้คอนเทนเนอร์ (Container)" && !d.seal) return "กรุณากรอก Seal No. สำหรับตู้คอนเทนเนอร์"; if (!d.timeEnd) return "กรุณาระบุเวลาขึ้นเสร็จ"; if (!d.driverName) return "กรุณาพิมพ์ชื่อพนักงานขับรถ"; if (!d.logisticsName) return "กรุณาพิมพ์ชื่อหัวหน้ากะโลจิสติกส์"; }
       return "";
     }
@@ -2482,7 +2504,7 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
         initChips(body); initSwitches(body);
         body.querySelectorAll("input, select, textarea").forEach(el => { el.addEventListener("change", readStep); el.addEventListener("input", readStep); });
         $("#w_prodYear")?.addEventListener("input", e => { const el = e.target, v = fmtSeason(el.value); if (el.value !== v) { el.value = v; el.setSelectionRange(v.length, v.length); } draft.prodYear = v; }); // ล็อกรูปแบบ YY/YY
-        body.addEventListener("click", () => setTimeout(() => { if (draft && mode === "wizard") readStep(); }, 0)); // ชิปตัวเลือก / สวิตช์ ไม่ยิง change
+        if (!body.dataset.stepBound) { body.dataset.stepBound = "1"; body.addEventListener("click", () => setTimeout(() => { if (draft && mode === "wizard") readStep(); }, 0)); } // ชิปตัวเลือก / สวิตช์ ไม่ยิง change · ผูกครั้งเดียว ไม่ซ้อนทุกครั้งที่วาดใหม่
         $("#w_cancel").addEventListener("click", async () => { if (step > 0) { readStep(); step--; renderMain(); return; } if (await ask("ยกเลิกการบันทึก", "ร่างนี้จะถูกลบและกู้คืนไม่ได้")) { draft = null; editUid = null; saveDraftState(); mode = "empty"; renderEntry(); } });
         $("#w_saveExit").addEventListener("click", () => { readStep(); toast("💾 บันทึกร่างไว้แล้ว"); draft = null; mode = "empty"; renderEntry(); });
         $("#w_delete")?.addEventListener("click", async () => { if (!editUid) return; if (!await ask("ลบบันทึก", "ลบใบบันทึกนี้ถาวร?")) return; dpSave(dpRecs().filter(x => x.uid !== editUid)); dpQueuePush({ action: "deleteDispatch", uid: editUid }); dpFlush(); draft = null; step = 0; editUid = null; cur = null; mode = "empty"; saveDraftState(); showTab("status"); renderMain(); renderEntry(); toast("ลบบันทึกแล้ว"); });
@@ -2508,13 +2530,16 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
           const d = draft; const prev = editUid ? (dpRecs().find(r => r.uid === editUid) || {}).status : null;
           d.status = "wait_check"; d.sigs = { ...(d.sigs || {}), driver: true, qc: true }; d.tons = dpTons(d);
           if (role === "admin" && editUid && prev && prev !== "draft") { d.status = prev; dpLog(d, "edited"); } else dpLog(d, prev === "returned" ? "resubmitted" : "submitted");
-          dpUpsert(d); dpPush(d); (d.photos || []).forEach((p, i) => dpQueuePush({ action: "savePhoto", uid: d.uid, index: i, dataUrl: p, date: d.date, plate: d.plate })); dpFlush();
+          const photoBase = (d.photoUrls || []).length; // รูปใหม่ต่อท้ายรูปที่ส่งไปแล้ว ไม่เขียนทับ
+          dpUpsert(d); dpPush(d); (d.photos || []).forEach((p, i) => dpQueuePush({ action: "savePhoto", uid: d.uid, index: photoBase + i, dataUrl: p, date: d.date, plate: d.plate })); dpFlush();
           cur = d; draft = null; editUid = null; saveDraftState(); mode = "detail"; showTab("status"); renderMain(); renderEntry(); toast("✓ ส่งแล้ว รอผู้ตรวจสอบ (QA)");
         });
       }
       if (mode === "detail" && cur) {
         const r = cur; const upd = (fn, msg) => { fn(r); dpUpsert(r); dpPush(r); renderMain(); toast(msg); };
-        $("#a_edit")?.addEventListener("click", () => { draft = JSON.parse(JSON.stringify(r)); editUid = r.uid; step = 0; mode = "wizard"; saveDraftState(); showTab("entry"); renderEntry(); });
+        $("#a_retry")?.addEventListener("click", async () => { toast("กำลังส่ง…"); await dpRetry(r.uid); if (!dpSyncState(r.uid)) { toast("<b>ส่งขึ้นระบบแล้ว</b>"); await dpRefresh(); cur = dpRecs().find(x => x.uid === r.uid) || cur; } renderMain(); });
+        $("#a_syncDrop")?.addEventListener("click", async () => { if (!await ask("ใช้ข้อมูลล่าสุดจากระบบ", "การเปลี่ยนแปลงในเครื่องนี้ที่ส่งไม่สำเร็จจะถูกทิ้ง")) return; await dpDiscard(r.uid); cur = dpRecs().find(x => x.uid === r.uid) || null; mode = cur ? "detail" : "empty"; renderMain(); toast("ใช้ข้อมูลล่าสุดจากระบบแล้ว"); });
+        $("#a_edit")?.addEventListener("click", () => { draft = JSON.parse(JSON.stringify(r)); if ((draft.photoUrls || []).length) draft.photos = []; /* รูปเดิมอยู่บนเซิร์ฟเวอร์แล้ว */ editUid = r.uid; step = 0; mode = "wizard"; saveDraftState(); showTab("entry"); renderEntry(); });
         $("#a_check")?.addEventListener("click", () => upd(x => { x.status = "wait_approve"; x.returnNote = ""; x.checkedBy = { name: me.name }; x.sigs = { ...(x.sigs || {}), logis: true }; dpLog(x, "checked"); }, "✓ ผ่านตรวจสอบ ส่งไปผู้อนุมัติ"));
         $("#a_return")?.addEventListener("click", async () => { const note = await ask("ส่งกลับแก้ไข", "ระบุเหตุผลให้ผู้บันทึกทราบ", true); if (!note) return; upd(x => { x.status = "returned"; x.returnNote = note; x.checkedBy = { name: me.name }; dpLog(x, "returned", note); }, "↩ ส่งกลับให้ผู้บันทึกแก้ไข"); });
         $("#a_approve")?.addEventListener("click", () => upd(x => { x.status = "done"; x.rejectNote = ""; x.approvedBy = { name: me.name }; x.sigs = { ...(x.sigs || {}), qa: true }; dpLog(x, "approved"); }, "✓ อนุมัติแล้ว บันทึกสมบูรณ์"));
@@ -2535,12 +2560,16 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
     document.addEventListener("qc:dispatch", () => { if (root.isConnected) renderList(); });
 
     // start: preselect from ?lot=, resume draft, refresh from sheet
-    if (params.get("lot") && (role === "recorder" || role === "admin")) { draft = dpNewDraft(); draft.lots = [{ no: params.get("lot"), bags: "", r: false, rNum: "" }]; const lot = (Q.rows || []).find(r => r.strike === params.get("lot")); if (lot) draft.sugarType = DP.SUGAR.find(s => s.includes(lot.grade)) || ""; step = 0; mode = "wizard"; saveDraftState(); }
+    if (params.get("lot") && (role === "recorder" || role === "admin")) { draft = dpNewDraft(); draft.lots = [{ no: params.get("lot"), bags: "", r: false, rNum: "" }]; const lot = strikeRow(params.get("lot")); if (lot && lot.grade) draft.sugarType = DP.SUGAR.find(s => s.includes(lot.grade)) || ""; step = 0; mode = "wizard"; saveDraftState(); }
     if (params.get("tab") === "status" || (role !== "recorder" && role !== "admin" && mode !== "wizard")) showTab("status");
     if (params.get("tab") === "dash") { showTab("dash"); renderDash(); }
     if (params.get("uid")) { const r = dpRecs().find(x => x.uid === params.get("uid")); if (r) { cur = r; mode = "detail"; showTab("status"); } }
     renderEntry(); renderMain(); loadQuality(false).then(() => { if (mode === "wizard") renderEntry(); });
-    dpRefresh().then(ok => { if (ok) { if (cur) cur = dpRecs().find(r => r.uid === cur.uid) || cur; renderList(); if (mode === "detail") renderMain(); if (mode === "empty" && tab === "entry") renderEntry(); if (tab === "dash") renderDash(); } }); dpFlush();
+    const refreshNow = () => dpRefresh().then(ok => { if (ok) { if (cur) cur = dpRecs().find(r => r.uid === cur.uid) || cur; renderList(); if (mode === "detail") renderMain(); if (mode === "empty" && tab === "entry") renderEntry(); if (tab === "dash") renderDash(); } });
+    refreshNow(); dpFlush();
+    // กลับมาเปิดแอป/แท็บนี้อีกครั้ง → ดึงงานล่าสุด ไม่ต้องออกแล้วเข้าใหม่
+    const onBack = () => { if (!root.isConnected) { document.removeEventListener("visibilitychange", onBack); return; } if (document.visibilityState === "visible") { dpFlush(); refreshNow(); } };
+    document.addEventListener("visibilitychange", onBack);
   },
 };
 
@@ -2574,13 +2603,14 @@ const coaRole = () => { const r = getUser().role || ""; return r === "ผู้�
 const coaQueue = () => JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]");
 const coaQueueSave = q => localStorage.setItem(COA_KEY.queue, JSON.stringify(q));
 const coaSyncState = certNo => { const q = coaQueue().filter(p => (p.record && p.record.certNo === certNo) || p.certNo === certNo); return !q.length ? null : q.some(p => p.error) ? { failed: true, error: q.find(p => p.error).error } : { pending: true }; };
+function coaDiscard(certNo) { coaQueueSave(coaQueue().filter(p => !((p.record && p.record.certNo === certNo) || p.certNo === certNo))); return coaRefresh(); }
 function coaRetry(certNo) { coaQueueSave(coaQueue().map(p => ((p.record && p.record.certNo === certNo) || p.certNo === certNo) ? { ...p, error: undefined } : p)); return coaFlush(); }
 async function coaFlush() {
-  const url = apiUrl(); if (!url || !navigator.onLine) return;
+  const url = apiUrl(); if (!url || !navigator.onLine || !getSession()) return;
   while (true) {
-    const q = coaQueue(); const item = q.find(p => !p.error); if (!item) break;
+    const q = coaQueue(); const item = q.find(p => !p.error && (!p.by || p.by === qOwner())); if (!item) break; // ส่งเฉพาะรายการของผู้ใช้ที่ล็อกอินอยู่
     try {
-      const { error, qid, ...payload } = item;
+      const { error, qid, by, ...payload } = item;
       const http = await apiFetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) }); const r = await http.json();
       const q2 = coaQueue(); const k = q2.findIndex(p => p.qid ? p.qid === item.qid : JSON.stringify(p) === JSON.stringify(item));
       if (!r.ok) {
@@ -2601,7 +2631,7 @@ async function coaRefresh() {
     local.forEach(r => { if (pending.has(r.certNo)) { if (have.has(r.certNo)) merged[have.get(r.certNo)] = r; else merged.push(r); } });
     coaSave(merged); return true; } catch (e) { return false; }
 }
-function coaPush(rec) { const recs = coaRecs(); const i = recs.findIndex(x => x.certNo === rec.certNo); if (i >= 0) recs[i] = rec; else recs.push(rec); coaSave(recs); const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q.push({ action: "saveCoa", record: rec, qid: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); return coaFlush(); }
+function coaPush(rec) { const recs = coaRecs(); const i = recs.findIndex(x => x.certNo === rec.certNo); if (i >= 0) recs[i] = rec; else recs.push(rec); coaSave(recs); const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]"); q.push({ action: "saveCoa", record: rec, by: qOwner(), qid: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); return coaFlush(); }
 
 views.coa = {
   bar: true, title: "ออกใบ COA", sub: "Certificate of Analysis · " + COA_FORM, icon: "btn-coa.png", accent: "mango",
@@ -2619,7 +2649,7 @@ views.coa = {
       <section class="panel ch-card"><div class="panel-body"><h3>Lot ที่รับรองแยกตามเกรด <small>จำนวน Lot</small></h3><div class="ch-box" id="d_chGrade"></div></div></section>
     </div>
     <div class="coa-dash-charts">
-      <section class="panel ch-card"><div class="panel-body"><h3>รอ QC กรอกผล <small id="d_pendN"></small></h3><div class="tbl-wrap" id="d_pending"></div></div></section>
+      <section class="panel ch-card"><div class="panel-body"><h3>งานค้าง (รอ QA / รออนุมัติ) <small id="d_pendN"></small></h3><div class="tbl-wrap" id="d_pending"></div></div></section>
       <section class="panel ch-card"><div class="panel-body"><h3>ใบ COA ล่าสุด</h3><div class="tbl-wrap" id="d_recent"></div></div></section>
     </div>
     <section class="panel ch-card"><div class="panel-body"><h3>สรุปรายลูกค้า <small>ช่วงเวลาที่เลือก</small></h3><div class="tbl-wrap" id="d_byCust"></div></div></section>
@@ -2639,6 +2669,7 @@ views.coa = {
     const $ = s => root.querySelector(s);
     const me = getUser(); const role = OPEN_ACCESS ? "admin" : coaRole(); const canReq = role === "sales" || role === "admin"; const canQc = role === "qc" || role === "admin"; const canApprove = role === "approver" || role === "admin";
     let cur = null, p1edit = false; // working copy of the selected record (status "new" until marketing saves); p1edit = part-1 unlocked for editing
+    let edAC = null, approverNames = null; // edAC: ล้างตัวรับเหตุการณ์ของรอบวาดก่อน ไม่ให้ซ้อนกัน · approverNames: ผู้อนุมัติที่ใช้งานอยู่จากฐานข้อมูล
     let tab = "main", dPeriod = "month", dGrade = "";
     const showTab = t => { tab = t; document.querySelectorAll(".fl-tabs .tab").forEach(b => { const on = b.dataset.tab === t; b.classList.toggle("on", on); b.setAttribute("aria-selected", on); }); $("#cTabMain").classList.toggle("hide", t !== "main"); $("#cTabDash").classList.toggle("hide", t !== "dash"); if (t === "dash") renderDash(); };
     document.querySelectorAll(".fl-tabs .tab").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -2653,22 +2684,22 @@ views.coa = {
       $("#d_grade").innerHTML = `<span class="dp-filter-lbl">เกรด</span><span class="dp-sel-wrap"><select class="dp-sel" id="d_gradeSel">` + [["", "ทุกเกรด"], ...GRADES.map(g => [g, g])].map(([v, l]) => `<option value="${v}" ${dGrade === v ? "selected" : ""}>${l}</option>`).join("") + `</select></span>`;
       const recs = dRecs(); const all = coaRecs(); const issued = recs.filter(r => r.status === "issued"); const pend = all.filter(r => r.status === "request" || r.status === "wait_approve"); const canc = recs.filter(r => r.cancelled);
       const lots = issued.flatMap(r => r.lots || []); const lotOk = lots.filter(l => !(l.fails || []).length).length;
-      const hrs = issued.filter(r => r.requestedAt && r.issuedAt).map(r => (new Date(r.issuedAt) - new Date(r.requestedAt)) / 36e5); const avgH = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : null;
+      const hrs = issued.filter(r => r.requestedAt && (r.approvedAt || r.issuedAt)).map(r => (new Date(r.approvedAt || r.issuedAt) - new Date(r.requestedAt)) / 36e5); const avgH = hrs.length ? hrs.reduce((a, b) => a + b, 0) / hrs.length : null;
       $("#d_sub").textContent = `${periods.find(p => p[0] === dPeriod)[1]}${dGrade ? " · " + dGrade : ""} · ${fmtInt(recs.length)} ใบ · อัปเดต ${fmtTs(Date.now())}`;
       const kpi = (v, l, cls = "") => `<div class="kpi ${cls}"><b>${v}</b><span>${l}</span></div>`;
-      $("#d_kpis").innerHTML = kpi(fmtInt(recs.length), "ใบ COA ทั้งหมด") + kpi(fmtInt(issued.length), "ออกใบแล้ว", "ok") + kpi(fmtInt(pend.length), "รอ QC กรอกผล (ทุกช่วง)", pend.length ? "warn" : "") + kpi(fmtInt(canc.length), "ยกเลิก", canc.length ? "bad" : "") + kpi(fmtInt(lots.length), "Lot ที่รับรอง") + kpi(lots.length ? fmt(lotOk / lots.length * 100, 0) + "%" : "—", "Lot ผ่านสเปคลูกค้า", lots.length && lotOk < lots.length ? "warn" : "ok") + kpi(fmtInt(new Set(issued.map(r => r.customer)).size), "ลูกค้าที่ออกใบให้") + kpi(avgH === null ? "—" : avgH < 48 ? fmt(avgH, 1) + " ชม." : fmt(avgH / 24, 1) + " วัน", "เวลาเฉลี่ย คำขอ → ออกใบ");
+      $("#d_kpis").innerHTML = kpi(fmtInt(recs.length), "ใบ COA ทั้งหมด") + kpi(fmtInt(issued.length), "ออกใบแล้ว", "ok") + kpi(fmtInt(pend.length), "รอ QA กรอกผล / รออนุมัติ (ทุกช่วง)", pend.length ? "warn" : "") + kpi(fmtInt(canc.length), "ยกเลิก", canc.length ? "bad" : "") + kpi(fmtInt(lots.length), "Lot ที่รับรอง") + kpi(lots.length ? fmt(lotOk / lots.length * 100, 0) + "%" : "—", "Lot ผ่านสเปคลูกค้า", lots.length && lotOk < lots.length ? "warn" : "ok") + kpi(fmtInt(new Set(issued.map(r => r.customer)).size), "ลูกค้าที่ออกใบให้") + kpi(avgH === null ? "—" : avgH < 48 ? fmt(avgH, 1) + " ชม." : fmt(avgH / 24, 1) + " วัน", "เวลาเฉลี่ย คำขอ → ออกใบ");
       // month bars (last 6 months, stacked by grade)
       const mk = []; const now = new Date(); for (let i = 5; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); mk.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }
       const base = coaRecs().filter(r => !r.cancelled && r.status === "issued" && (!dGrade || dGradeOf(r) === dGrade));
       CH.bars($("#d_chMonth"), { labels: mk.map(k => `${TH_MON[+k.slice(5, 7) - 1]} ${k.slice(2, 4)}`), stacks: (dGrade ? [dGrade] : GRADES).map(g => ({ name: g, color: GRADE_COLOR[g], values: mk.map(k => base.filter(r => (r.reqDate || "").startsWith(k) && dGradeOf(r) === g).length) })), unit: " ใบ" });
-      CH.donut($("#d_chStatus"), { parts: [{ name: "ออกใบแล้ว", value: issued.length, color: "#2ec24a" }, { name: "รอ QC", value: recs.filter(r => r.status === "request").length, color: "#ff9f1c" }, { name: "ยกเลิก", value: canc.length, color: "#e5484d" }] });
+      CH.donut($("#d_chStatus"), { parts: [{ name: "ออกใบแล้ว", value: issued.length, color: "#2ec24a" }, { name: "รอ QA", value: recs.filter(r => r.status === "request").length, color: "#ff9f1c" }, { name: "รออนุมัติ", value: recs.filter(r => r.status === "wait_approve").length, color: "#1e90ff" }, { name: "ยกเลิก", value: canc.length, color: "#e5484d" }] });
       const byC = {}; issued.forEach(r => { byC[r.customer] = (byC[r.customer] || 0) + 1; }); const cmax = Math.max(1, ...Object.values(byC));
       CH.hbars($("#d_chCust"), { rows: Object.entries(byC).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label, v]) => ({ label, sub: `${v} ใบ`, pct: v / cmax * 100, color: "#1e90ff" })), unit: "%" });
       const byG = {}; issued.forEach(r => { byG[dGradeOf(r)] = (byG[dGradeOf(r)] || 0) + (r.lots || []).length; }); const gmax = Math.max(1, ...Object.values(byG));
       CH.hbars($("#d_chGrade"), { rows: Object.entries(byG).sort((a, b) => b[1] - a[1]).map(([label, v]) => ({ label, sub: `${v} Lot`, pct: v / gmax * 100, color: GRADE_COLOR[label] || "#8a97a8" })), unit: "%" });
       const age = r => { const h = (Date.now() - new Date(r.requestedAt || r.ts || Date.now())) / 36e5; return h < 24 ? `${fmt(h, 0)} ชม.` : `${fmt(h / 24, 1)} วัน`; };
       $("#d_pendN").textContent = `${pend.length} ใบ`;
-      $("#d_pending").innerHTML = pend.length ? `<table class="ctab"><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เกรด</th><th>รถ</th><th>Lot</th><th class="r">รอมาแล้ว</th></tr></thead><tbody>${pend.sort((a, b) => (a.ts || 0) - (b.ts || 0)).map(r => `<tr><td><a href="#/coa?no=${encodeURIComponent(r.certNo)}" data-open="${esc(r.certNo)}">${esc(r.certNo)}</a></td><td>${esc(r.customer)}</td><td>${esc(r.grade)}</td><td>${esc(r.truckNo || "—")}</td><td>${esc(r.lotNumber || "—")}</td><td class="r">${age(r)}</td></tr>`).join("")}</tbody></table>` : `<div class="okline">✓ ไม่มีใบค้าง QC</div>`;
+      $("#d_pending").innerHTML = pend.length ? `<table class="ctab"><thead><tr><th>เลขที่</th><th>ลูกค้า</th><th>เกรด</th><th>รถ</th><th>Lot</th><th class="r">รอมาแล้ว</th></tr></thead><tbody>${pend.sort((a, b) => (a.ts || 0) - (b.ts || 0)).map(r => `<tr><td><a href="#/coa?no=${encodeURIComponent(r.certNo)}" data-open="${esc(r.certNo)}">${esc(r.certNo)}</a></td><td>${esc(r.customer)}</td><td>${esc(r.grade)}</td><td>${esc(r.truckNo || "—")}</td><td>${esc(r.lotNumber || "—")}</td><td class="r">${age(r)}</td></tr>`).join("")}</tbody></table>` : `<div class="okline">✓ ไม่มีใบค้าง</div>`;
       const recent = [...all].filter(r => r.status !== "new").sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 8);
       $("#d_recent").innerHTML = recent.length ? `<table class="ctab"><thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th>สถานะ</th><th class="r">Lot</th></tr></thead><tbody>${recent.map(r => `<tr><td><a href="#/coa?no=${encodeURIComponent(r.certNo)}" data-open="${esc(r.certNo)}">${esc(r.certNo)}</a></td><td>${isoToDmy(r.reqDate)}</td><td>${esc(r.customer)}</td><td><span class="pill ${COA_STATUS[stOf(r)][1]}">${COA_STATUS[stOf(r)][0]}</span></td><td class="r">${(r.lots || []).length}</td></tr>`).join("")}</tbody></table>` : `<div class="ch-empty">ยังไม่มีใบ COA</div>`;
       const cust = {}; recs.forEach(r => { const c = cust[r.customer] = cust[r.customer] || { n: 0, issued: 0, canc: 0, lots: 0, bad: 0, grades: new Set() }; c.n++; if (r.status === "issued") { c.issued++; c.lots += (r.lots || []).length; c.bad += (r.lots || []).filter(l => (l.fails || []).length).length; } if (r.cancelled) c.canc++; c.grades.add(dGradeOf(r)); });
@@ -2681,13 +2712,13 @@ views.coa = {
     $("#d_print").addEventListener("click", () => window.print());
     $("#d_csv").addEventListener("click", () => {
       const H = ["Certificate No.", "Date", "Status", "COA Request No.", "Customer", "Company of Import", "Truck No.", "Grade", "Lot Number", "Export Invoice NO", "S/O", "Booking", "Packed in", "Ton", "Remark", "Shipment Lot", "Lots certified", "Lots out of spec", "Reporter", "Approved by", "Requested by", "Issued at", "Cancel reason"];
-      const rows = dRecs().map(r => [r.certNo, isoToDmy(r.reqDate), COA_STATUS[stOf(r)][0], r.reqNo, r.customer, r.importer, coaTrucksOf(r).join(", "), r.grade, r.lotNumber, r.invoiceNo, r.soNo, r.booking, r.packIn, r.packedTons, r.remark, r.shipmentLot, (r.lots || []).map(l => l.strike).join(" "), (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(" "), r.reporter, r.approvedBy, r.requestedBy, r.issuedAt ? fmtTs(r.issuedAt) : "", r.cancelReason || ""]);
+      const rows = dRecs().map(r => [r.certNo, isoToDmy(r.reqDate), COA_STATUS[stOf(r)][0], r.reqNo, r.customer, r.importer, coaTrucksOf(r).join(", "), r.grade, r.lotNumber, r.invoiceNo, r.soNo, r.booking, r.packIn, r.packedTons, r.remark, r.shipmentLot, (r.lots || []).map(l => l.strike).join(" "), (r.lots || []).filter(l => (l.fails || []).length).map(l => l.strike).join(" "), r.reporter, r.approvedBy, r.requestedBy, (r.approvedAt || r.issuedAt) ? fmtTs(r.approvedAt || r.issuedAt) : "", r.cancelReason || ""]);
       const csv = "﻿" + [H, ...rows].map(a => a.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
       const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `QCTime-COA-${todayIso().replace(/-/g, "")}.csv`; a.click(); toast("⬇ ดาวน์โหลด CSV แล้ว");
     });
-    const lotOf = no => (Q.rows || []).find(r => r.strike === String(no));
+    const lotOf = no => strikeRow(no);
     const specFor = rec => { const n = (rec.customer || "").trim().toLowerCase(); const g = gradeOfProduct(rec.grade || ""); return (Q.specs || []).find(s => s.name.toLowerCase() === n && (!g || s.grade === g)) || (Q.specs || []).find(s => s.name.toLowerCase() === n); };
-    const nextCertNo = d => { const ym = (d || todayIso()).slice(2, 4) + (d || todayIso()).slice(5, 7); const n = coaRecs().filter(r => (r.certNo || "").startsWith("COA-" + ym)).length + 1; return `COA-${ym}-${String(n).padStart(4, "0")}`; };
+    const nextCertNo = d => { const ym = (d || todayIso()).slice(2, 4) + (d || todayIso()).slice(5, 7); const n = coaRecs().reduce((m, r) => { const x = String(r.certNo || "").match(new RegExp("^COA-" + ym + "-(\\d+)$")); return x ? Math.max(m, +x[1]) : m; }, 0) + 1; /* เลขมากสุด+1: ลบร่างแล้วเลขไม่ชนใบเดิม */ return `COA-${ym}-${String(n).padStart(4, "0")}`; };
     const stOf = r => r.cancelled ? "cancelled" : r.status || "request";
     const isDraftCoa = r => ["new", "request", "wait_approve"].includes(stOf(r)); // ยังไม่อนุมัติ = ร่าง
     const p1Ok = r => !!(r.certNo && r.customer && r.grade);
@@ -2725,7 +2756,7 @@ views.coa = {
           <tr class="sp"><td>Method</td><td>-</td><td>-</td>${COA_COLS.map(c => `<td>${v((rec.method || {})[c[0]])}</td>`).join("")}</tr>
         </tbody></table></div>
         ${rec.cancelled ? `<div class="coa-cancel">CANCELLED · ${esc(rec.cancelReason || "")} · by ${esc(rec.cancelledBy || "")} ${rec.cancelledAt ? fmtTs(rec.cancelledAt) : ""}</div>` : ""}
-        <div class="cf-sign"><div><div class="sig-slot">${signatureFor(rec.reporter) ? `<img src="${signatureFor(rec.reporter)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.reporter)}</b><span>Reporter</span></div><div><div class="sig-slot">${signatureFor(rec.approvedBy) ? `<img src="${signatureFor(rec.approvedBy)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.approvedBy)}</b><span>Approved by</span></div></div>
+        <div class="cf-sign"><div><div class="sig-slot">${signatureFor(rec.reporter) ? `<img src="${signatureFor(rec.reporter)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.reporter)}</b><span>Reporter</span></div><div><div class="sig-slot">${(rec.status === "issued" || rec.approvedAt) && signatureFor(rec.approvedBy) ? `<img src="${signatureFor(rec.approvedBy)}" alt="ลายเซ็น">` : ""}</div><i>..................................................</i><b>${v(rec.approvedBy)}</b><span>Approved by</span></div></div>
         <div class="cf-foot">${v(rec.form || COA_FORM)}</div>
       </div>`;
     }
@@ -2754,8 +2785,9 @@ views.coa = {
       cur.trucks = coaTrucksOf(cur); // Rev.06 records kept one truckNo string
       const frozen = cur.status === "issued" || cur.cancelled; // issued paper keeps the form / methods it was issued with
       if (!frozen) cur.form = COA_FORM;
-      const sp = specFor(cur); const spec = {}; COA_COLS.forEach(c => spec[c[0]] = (cur.spec && cur.spec[c[0]]) || (sp && sp.rules[c[0]] ? sp.rules[c[0]].text : "")); cur.spec = spec; cur.method = frozen ? { ...COA_METHOD, ...(cur.method || {}) } : { ...COA_METHOD };
-      if (cur.lots && cur.lots.length) cur.lots = cur.lots.map(l => lotRow(l.strike, l));
+      const sp = specFor(cur); const spec = {}; COA_COLS.forEach(c => { const rule = sp && sp.rules[c[0]] ? sp.rules[c[0]].text : "", kept = (cur.spec && cur.spec[c[0]]) || ""; spec[c[0]] = frozen ? (kept || rule) : sp ? rule : kept; }); /* ใบที่ยังไม่อนุมัติตามสเปคของลูกค้าปัจจุบันเสมอ */ cur.spec = spec; cur.method = frozen ? { ...COA_METHOD, ...(cur.method || {}) } : { ...COA_METHOD };
+      if (frozen) cur.lots = (cur.lots || []).map(l => ({ ...l, found: true, gradeOk: true })); /* ใบที่อนุมัติ/ยกเลิกแล้วคงค่าตามที่ออกใบ ไม่เปลี่ยนตามฐานข้อมูล */
+      else if (cur.lots && cur.lots.length) cur.lots = cur.lots.map(l => lotRow(l.strike, l));
       else if (cur.status !== "new") { // suggest lots: delivery records of the chosen trucks, else the lot numbers marketing typed
         const dispSet = dispatchedSet();
         let nos = cur.trucks.map(coaDispOf).filter(Boolean).flatMap(d => (d.lots || []).map(l => l.no).filter(Boolean)); if (!nos.length) nos = (cur.lotNumber || "").split(/[,\s/]+/).filter(x => /^\d+$/.test(x));
@@ -2777,16 +2809,17 @@ views.coa = {
 
     /* ---- editor: part 1 (marketing) + part 2 (QC) on the same record ---- */
     function renderEditor() {
+      edAC?.abort(); edAC = new AbortController(); const onlyThisRender = { signal: edAC.signal }; // #c_editor อยู่ถาวร: ตัวรับเก่าต้องถูกถอด มิฉะนั้นกดลบ Lot ครั้งเดียวจะลบหลายแถว
       if (!cur) { $("#c_editor").innerHTML = ""; return; }
       const st = stOf(cur); const saved = st !== "new"; const p1open = canReq && st !== "cancelled" && (st !== "issued" || role === "admin") && (st === "new" || p1edit); const p2 = canQc && st === "request"; // QA แก้ส่วน 2 ได้เฉพาะช่วงรอกรอกผล
       if (p2 && !cur.reporter) cur.reporter = me.name; // ผู้กรอกผล (QA) ขึ้นในใบทันที
-      const APPROVERS = [...new Set(USERS.filter(u => u.role === "ผู้อนุมัติ").map(u => u.name).concat(cur.approvedBy ? [cur.approvedBy] : []))];
+      const APPROVERS = [...new Set((approverNames || USERS.filter(u => u.role === "ผู้อนุมัติ").map(u => u.name)).concat(cur.approvedBy ? [cur.approvedBy] : []))];
       const sp = specFor(cur); const allOk = cur.lots.length > 0 && cur.lots.every(l => l.found && l.gradeOk && !l.fails.length);
       const dispSet = dispatchedSet();
       const f = (id, label, ctl, req) => `<div class="field"><label class="${req ? "req" : ""}" for="${id}">${label}</label>${ctl}</div>`;
       const dis = p1open ? "" : "disabled"; const dis2 = p2 ? "" : "disabled";
       $("#c_editor").innerHTML = `
-        ${(() => { const s = cur.status !== "new" && coaSyncState(cur.certNo); return !s ? "" : s.failed ? `<div class="coa-syncbar bad"><div><b>⚠ ใบนี้ยังไม่ได้บันทึกขึ้นระบบ</b><span>เซิร์ฟเวอร์ปฏิเสธ: ${esc(s.error)}</span><small>ผู้อื่น (เช่น ผู้อนุมัติ) จะยังไม่เห็นใบนี้ จนกว่าจะส่งสำเร็จ</small></div><button type="button" class="btn sm" id="e_retry">ส่งอีกครั้ง</button></div>` : `<div class="coa-syncbar"><div><b>⏳ รอส่งขึ้นระบบ</b><span>ใบนี้ยังอยู่ในเครื่องนี้ จะส่งเองเมื่อออนไลน์ · ผู้อื่นยังไม่เห็น</span></div><button type="button" class="btn sm ghost" id="e_retry">ส่งตอนนี้</button></div>`; })()}
+        ${(() => { const s = cur.status !== "new" && coaSyncState(cur.certNo); return !s ? "" : s.failed ? `<div class="coa-syncbar bad"><div><b>⚠ ใบนี้ยังไม่ได้บันทึกขึ้นระบบ</b><span>เซิร์ฟเวอร์ปฏิเสธ: ${esc(s.error)}</span><small>ผู้อื่น (เช่น ผู้อนุมัติ) จะยังไม่เห็นการเปลี่ยนแปลงนี้ จนกว่าจะส่งสำเร็จ · ถ้ามีคนดำเนินการใบนี้ไปแล้ว ให้กดใช้ข้อมูลล่าสุด</small></div><div class="row"><button type="button" class="btn sm" id="e_retry">ส่งอีกครั้ง</button><button type="button" class="btn sm ghost" id="e_syncDrop">ใช้ข้อมูลล่าสุดจากระบบ</button></div></div>` : `<div class="coa-syncbar"><div><b>⏳ รอส่งขึ้นระบบ</b><span>ใบนี้ยังอยู่ในเครื่องนี้ จะส่งเองเมื่อออนไลน์ · ผู้อื่นยังไม่เห็น</span></div><button type="button" class="btn sm ghost" id="e_retry">ส่งตอนนี้</button></div>`; })()}
         <div class="coa-sec"><div class="section-title"><h2>ส่วนที่ 1 · การตลาด</h2><span class="pill ${COA_STATUS[st][1]}">${COA_STATUS[st][0]}</span></div>
           <div class="grid-2">${f("e_date", "Date", `<input class="input" id="e_date" type="date" value="${esc(cur.reqDate)}" data-f="reqDate" ${dis}>`, true)}${f("e_cert", "Certificate No.", `<input class="input" id="e_cert" value="${esc(cur.certNo)}" data-f="certNo" ${saved ? "readonly" : dis}>`, true)}</div>
           ${f("e_reqNo", "COA Request No. (ฝกต.)", `<input class="input" id="e_reqNo" value="${esc(cur.reqNo)}" data-f="reqNo" placeholder="เลขที่คำขอจากฝ่ายการตลาด" ${dis}>`)}
@@ -2794,7 +2827,7 @@ views.coa = {
             <div class="coa-trucks">${coaTrucksOf(cur).map((t, i) => { const d = coaDispOf(t); return `<span class="coa-truck ${d ? "" : "nod"}"><i>${String.fromCharCode(97 + i)}</i><b>${esc(t)}</b>${d ? `<small>${esc(isoToDmy(d.date))} · ${fmt(+d.tons || dpTons(d), 3)} ตัน</small>` : `<small>ไม่พบในบันทึกจ่ายออก</small>`}${p1open ? `<button type="button" class="rm" data-trm="${i}" aria-label="ลบ">×</button>` : ""}</span>`; }).join("") || `<span class="muted" style="font-size:12.5px">ยังไม่ได้เลือกรถ · เลือกแล้วระบบดึงลูกค้า เกรด บรรจุ น้ำหนัก และ Lot จากบันทึกจ่ายออกให้</span>`}</div>`)}
           ${f("e_cust", "Company of Customer Request", `<input class="input" id="e_cust" data-combo="coaCustomers" value="${esc(cur.customer)}" data-f="customer" placeholder="ชื่อบริษัทลูกค้า" autocomplete="off" ${dis}><datalist id="coaCustomers">${[...new Set((Q.specs || []).map(s => s.name))].map(n => `<option value="${esc(n)}">`).join("")}</datalist>`, true)}
           ${f("e_imp", "Company of Import", `<input class="input" id="e_imp" data-combo="coaCustomers" value="${esc(cur.importer || "")}" data-f="importer" placeholder="บริษัทผู้นำเข้า" autocomplete="off" ${dis}>`)}
-          <div class="grid-2">${f("e_grade", "Grade of Sugar", `<select class="select" id="e_grade" data-f="grade" ${dis}><option value="">— เลือก —</option>${COA_GRADES.map(g => `<option ${g === cur.grade ? "selected" : ""}>${g}</option>`).join("")}</select>`, true)}${f("e_lot", "Lot Number", `<input class="input" id="e_lot" list="coaDispLots" value="${esc(cur.lotNumber)}" data-f="lotNumber" placeholder="ดึงจากรถที่เลือก เช่น 259, 262" autocomplete="off" ${dis}><datalist id="coaDispLots">${[...dispSet].slice(0, 500).map(n => { const lo = (Q.rows || []).find(r => r.strike === n); return `<option value="${esc(n)}">${lo ? esc(lo.grade) : "จ่ายออกแล้ว"}</option>`; }).join("")}</datalist>`)}</div>
+          <div class="grid-2">${f("e_grade", "Grade of Sugar", `<select class="select" id="e_grade" data-f="grade" ${dis}><option value="">— เลือก —</option>${COA_GRADES.map(g => `<option ${g === cur.grade ? "selected" : ""}>${g}</option>`).join("")}</select>`, true)}${f("e_lot", "Lot Number", `<input class="input" id="e_lot" list="coaDispLots" value="${esc(cur.lotNumber)}" data-f="lotNumber" placeholder="ดึงจากรถที่เลือก เช่น 259, 262" autocomplete="off" ${dis}><datalist id="coaDispLots">${[...dispSet].slice(0, 500).map(n => { const lo = strikeRow(n); return `<option value="${esc(n)}">${lo ? esc(lo.grade) : "จ่ายออกแล้ว"}</option>`; }).join("")}</datalist>`)}</div>
           <div class="coa-remark"><span class="coa-remark-h">Remark</span>
             <div class="grid-2">${f("e_inv", "Export Invoice NO", `<input class="input" id="e_inv" value="${esc(cur.invoiceNo || "")}" data-f="invoiceNo" ${dis}>`)}${f("e_so", "S/O", `<input class="input" id="e_so" value="${esc(cur.soNo || "")}" data-f="soNo" ${dis}>`)}</div>
             <div class="grid-2">${f("e_book", "Booking", `<input class="input" id="e_book" value="${esc(cur.booking || "")}" data-f="booking" ${dis}>`)}<div class="grid-2">${f("e_pack", "PACKED IN", `<input class="input" id="e_pack" list="coaPacks" value="${esc(cur.packIn || "")}" data-f="packIn" placeholder="เช่น 50 kg" autocomplete="off" ${dis}><datalist id="coaPacks">${DP.PACK.map(p => `<option value="${esc(p)}">`).join("")}</datalist>`)}${f("e_tons", "Ton", `<input class="input" id="e_tons" value="${esc(cur.packedTons || "")}" data-f="packedTons" inputmode="decimal" placeholder="รวมจากรถ" ${dis}>`)}</div></div>
@@ -2810,10 +2843,11 @@ views.coa = {
               : ""}
         </div>
         <div class="coa-sec ${p2 ? "" : "locked"}"><div class="section-title"><h2>ส่วนที่ 2 · QA</h2><span class="pill ${COA_STATUS[st] ? COA_STATUS[st][1] : "wait"}">${saved ? COA_STATUS[st][0] : "รอส่วนที่ 1"}</span></div>
+          ${st === "request" && cur.rejectedBy ? `<div class="dp-banner">↩ ผู้อนุมัติตีกลับ (${esc(cur.rejectedBy)})${cur.rejectNote ? ": " + esc(cur.rejectNote) : " · ไม่ได้ระบุเหตุผล"}</div>` : ""}
           ${!saved ? `<p class="muted" style="font-size:13px">เมื่อการตลาดกดบันทึกแล้ว QA เปิดใบเดิมนี้เพื่อกรอกผลต่อได้ทันที</p>` : (st === "request" && !p2) ? `<div class="coa-wait">${ICON.clock} ส่งให้ QA แล้ว · รอ QA กรอกผลวิเคราะห์</div>` : `
           <div class="facts one coa-reqfacts"><div><span>สเปคที่ใช้</span><b>${sp ? esc(sp.name + " · " + sp.product) : '<span class="bad">ไม่พบลูกค้านี้ในชีต Spec</span>'}</b></div></div>
-          <div class="field mt"><label class="${p2 ? "req" : ""}">Lot / Strike ที่รับรอง (เฉพาะลอตที่จ่ายออกแล้ว)</label>${p2 ? `<div class="coa-lotadd"><select class="select" id="e_lotIn"><option value="">— เลือก Lot ที่จ่ายออกแล้ว —</option>${(Q.rows || []).filter(r => r.status !== "ไม่ผ่าน" && (!sp || r.grade === sp.grade) && dispSet.has(r.strike) && !cur.lots.some(l => l.strike === r.strike)).slice(0, 500).map(r => `<option value="${esc(r.strike)}">${esc(r.strike)} · ${esc(r.grade)} · สี ${fmtN(r.color, 0)} · ${esc(r.date)}</option>`).join("")}</select><button class="btn sm" id="e_lotAdd" type="button">เพิ่ม</button></div>` : ""}
-            <div class="coa-lots">${cur.lots.map((l, i) => `<div class="coa-lot ${!l.found ? "" : l.gradeOk && !l.fails.length ? "ok" : "bad"}"><b>${esc(l.strike)}</b><span>${l.found ? `ผลิต ${esc(l.prodDate)} · สี ${esc(l.color)} · Pol ${esc(l.pol)}` : "ไม่พบใน Quality"}</span><input class="input" data-bb="${i}" value="${esc(l.bestBefore)}" placeholder="Best before" aria-label="Best before" ${dis2}><i>${!l.found ? "" : !l.gradeOk ? "เกรดไม่ตรงสเปค" : l.fails.length ? l.fails.join(" · ") : "ผ่านสเปค"}</i>${p2 ? `<button type="button" class="rm" data-rm="${i}" aria-label="ลบ">×</button>` : "<span></span>"}</div>`).join("") || `<p class="muted" style="font-size:13px">ยังไม่มี Lot · ระบบเสนอ Lot จากใบส่งมอบของรถทะเบียนเดียวกัน · เพิ่มได้เฉพาะลอตที่จ่ายออกแล้ว</p>`}</div></div>
+          <div class="field mt"><label class="${p2 ? "req" : ""}">Lot / Strike ที่รับรอง (เฉพาะลอตที่จ่ายออกแล้ว)</label>${p2 ? `<div class="coa-lotadd"><select class="select" id="e_lotIn"><option value="">— เลือก Lot ที่จ่ายออกแล้ว —</option>${(Q.rows || []).filter(r => r.status !== "ไม่ผ่าน" && (!sp || r.grade === sp.grade) && dispSet.has(r.strike) && !cur.lots.some(l => l.strike === r.strike) && r === strikeRow(r.strike)).slice(0, 500).map(r => `<option value="${esc(r.strike)}">${esc(r.strike)} · ${esc(r.grade)} · สี ${fmtN(r.color, 0)} · ${esc(r.date)}</option>`).join("")}</select><button class="btn sm" id="e_lotAdd" type="button">เพิ่ม</button></div>` : ""}
+            <div class="coa-lots">${cur.lots.map((l, i) => `<div class="coa-lot ${!l.found ? "" : l.gradeOk && !l.fails.length ? "ok" : "bad"}"><b>${esc(l.strike)}</b><span>${l.found ? `ผลิต ${esc(l.prodDate)} · สี ${esc(l.color)} · Pol ${esc(l.pol)}${lotHits(l.strike).length > 1 ? " · ⚠ Strike ซ้ำ ใช้วันผลิตล่าสุด" : ""}` : "ไม่พบใน Quality"}</span><input class="input" data-bb="${i}" value="${esc(l.bestBefore)}" placeholder="Best before" aria-label="Best before" ${dis2}><i>${!l.found ? "" : !l.gradeOk ? "เกรดไม่ตรงสเปค" : l.fails.length ? l.fails.join(" · ") : "ผ่านสเปค"}</i>${p2 ? `<button type="button" class="rm" data-rm="${i}" aria-label="ลบ">×</button>` : "<span></span>"}</div>`).join("") || `<p class="muted" style="font-size:13px">ยังไม่มี Lot · ระบบเสนอ Lot จากใบส่งมอบของรถทะเบียนเดียวกัน · เพิ่มได้เฉพาะลอตที่จ่ายออกแล้ว</p>`}</div></div>
           <div class="section-title" style="margin-top:16px"><h2>ค่าคุณภาพ / Specification / Method</h2><span class="hint">ค่าดึงจากฐานข้อมูลคุณภาพ · อ่านอย่างเดียว</span></div>
           <div class="tbl-wrap"><table class="spec coa-sm"><thead><tr><th>รายการ</th><th>ค่าที่วัดได้</th><th>Specification</th><th>Method</th></tr></thead><tbody>${COA_COLS.map(c => { const vals = cur.lots.map(l => ({ v: l[c[0]], bad: l.fails && l.fails.some(f => f.startsWith(PARAM[c[0]])) })); const valCell = vals.length ? vals.map(x => `<span class="${x.bad ? "bad" : ""}">${esc(x.v || "—")}</span>`).join(" / ") : "—"; return `<tr><td class="name"><b>${c[1]}</b><small>${c[2]}</small></td><td class="mval">${valCell}</td><td class="rd">${esc(cur.spec[c[0]] || "—")}</td><td class="rd">${esc(cur.method[c[0]] || "—")}</td></tr>`; }).join("")}</tbody></table></div>
           <div class="grid-2 mt"><div class="field"><label>Reporter</label><input class="input" value="${esc(cur.reporter || me.name)}" readonly></div><div class="field"><label class="${p2 ? "req" : ""}" for="e_appr">Approved by</label>${p2 ? `<select class="select" id="e_appr"><option value="">— เลือกผู้อนุมัติ —</option>${APPROVERS.map(n => `<option ${n === cur.approvedBy ? "selected" : ""}>${esc(n)}</option>`).join("")}</select>` : `<input class="input" value="${esc(cur.approvedBy || "—")}" readonly>`}</div></div>
@@ -2827,6 +2861,7 @@ views.coa = {
                 ? `<div class="verdict pass">${ICON.okc} อนุมัติแล้ว${cur.approvedActionBy ? " · โดย " + esc(cur.approvedActionBy) : ""} · กดปุ่มด้านล่างเพื่อพิมพ์ใบ</div>`
                 : ""}`}
         </div>`;
+      $("#e_syncDrop")?.addEventListener("click", async () => { if (!confirm("ทิ้งการเปลี่ยนแปลงในเครื่องนี้ที่ส่งไม่สำเร็จ แล้วใช้ข้อมูลล่าสุดจากระบบ?")) return; const no = cur.certNo; await coaDiscard(no); const r = coaRecs().find(x => x.certNo === no); if (r) open(r); else { cur = null; renderEditor(); renderPaper(); } renderList(); toast("ใช้ข้อมูลล่าสุดจากระบบแล้ว"); });
       $("#e_retry")?.addEventListener("click", async () => { toast("กำลังส่ง…"); await coaRetry(cur.certNo); const s = coaSyncState(cur.certNo); if (!s) { toast("<b>ส่งขึ้นระบบแล้ว</b> ผู้อื่นเห็นใบนี้แล้ว"); await coaRefresh(); } renderEditor(); renderList(); });
       $("#e_edit1")?.addEventListener("click", () => { if (!canReq) return; p1edit = true; renderEditor(); renderPaper(); });
       $("#e_done1")?.addEventListener("click", () => { cur = null; p1edit = false; renderEditor(); renderPaper(); renderList(); });
@@ -2839,8 +2874,8 @@ views.coa = {
         else if (t.dataset.sp) cur.spec[t.dataset.sp] = t.value; else if (t.dataset.mt) cur.method[t.dataset.mt] = t.value;
         else if (t.id === "e_appr") cur.approvedBy = t.value; else return;
         renderPaper(); const b = $("#e_submit"); if (b) b.disabled = !(cur.lots.length && cur.approvedBy); const s1 = $("#e_save1"); if (s1) s1.disabled = !p1Ok(cur);
-      });
-      $("#c_editor").addEventListener("click", e => { const b = e.target.closest("[data-rm]"); if (!b || !p2) return; cur.lots.splice(+b.dataset.rm, 1); renderEditor(); renderPaper(); });
+      }, onlyThisRender);
+      $("#c_editor").addEventListener("click", e => { const b = e.target.closest("[data-rm]"); if (!b || !p2) return; cur.lots.splice(+b.dataset.rm, 1); renderEditor(); renderPaper(); }, onlyThisRender);
       if (p1open) { // Truck No. a–p: add / remove → refill customer, grade, pack, tons, lots from the delivery records
         const addTruck = () => {
           const inp = $("#e_truckIn"); const t = (inp?.value || "").trim(); if (!t) { toast("เลือกทะเบียนรถก่อน"); return; }
@@ -2856,7 +2891,7 @@ views.coa = {
       const s1 = $("#e_save1"); if (s1) { s1.disabled = !p1Ok(cur); s1.addEventListener("click", () => {
         if (!p1Ok(cur)) return; const dup = coaRecs().find(r => r.certNo === cur.certNo); if (!saved && dup) { toast(`เลขที่ ${esc(cur.certNo)} มีอยู่แล้ว`); return; }
         if (!saved) { cur.status = "request"; cur.requestedBy = me.name; cur.requestedAt = new Date().toISOString(); }
-        cur.ts = Date.now(); coaPush(toStore()).then(renderList); toast(`<b>บันทึกใบ ${esc(cur.certNo)} แล้ว</b> QC เข้ามากรอกผลต่อได้`, 3000); open(toStore()); renderList();
+        cur.ts = Date.now(); coaPush(toStore()).then(renderList); toast(`<b>บันทึกใบ ${esc(cur.certNo)} แล้ว</b> QA เข้ามากรอกผลต่อได้`, 3000); open(toStore()); renderList();
       }); }
       const dc = $("#e_discard"); if (dc) dc.addEventListener("click", () => { cur = null; const l = coaRecs().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0]; if (l) open(l); else { renderEditor(); renderPaper(); } renderList(); });
       if (p2) {
@@ -2866,20 +2901,21 @@ views.coa = {
         $("#e_submit").addEventListener("click", () => {
           if (!cur.lots.length) { toast("เพิ่ม Lot ก่อน"); return; } if (!cur.approvedBy) { toast("เลือกผู้อนุมัติก่อน"); return; }
           if (!allOk && !confirm("มี Lot ที่ไม่ผ่านสเปคหรือไม่พบข้อมูล ต้องการส่งอนุมัติต่อหรือไม่?")) return;
-          cur.reporter = cur.reporter || me.name; cur.status = "wait_approve"; cur.submittedBy = me.name; cur.submittedAt = new Date().toISOString(); cur.ts = Date.now();
+          cur.reporter = cur.reporter || me.name; cur.status = "wait_approve"; cur.submittedBy = me.name; cur.submittedAt = new Date().toISOString(); cur.rejectNote = ""; cur.rejectedBy = ""; cur.ts = Date.now();
           coaPush(toStore()).then(renderList); toast(`<b>ส่งให้ผู้อนุมัติแล้ว</b> ${esc(cur.approvedBy)} จะเป็นผู้อนุมัติใบ ${esc(cur.certNo)}`, 3400); open(toStore()); renderList();
         });
       }
       $("#e_approve")?.addEventListener("click", () => {
         if (!canApprove || stOf(cur) !== "wait_approve") return;
         if (!confirm(`อนุมัติใบ ${cur.certNo}? หลังอนุมัติจะแก้ไขไม่ได้`)) return;
-        cur.status = "issued"; cur.approvedActionBy = me.name; cur.approvedAt = new Date().toISOString(); cur.issuedBy = cur.submittedBy || cur.reporter; cur.ts = Date.now();
+        if (role === "approver") cur.approvedBy = me.name; // ชื่อและลายเซ็นบนใบ = คนที่กดอนุมัติจริง (แอดมินกดแทน คงชื่อที่ QA เลือกไว้)
+        cur.status = "issued"; cur.approvedActionBy = me.name; cur.approvedAt = cur.issuedAt = new Date().toISOString(); cur.issuedBy = cur.submittedBy || cur.reporter; cur.ts = Date.now();
         coaPush(toStore()).then(renderList); toast(`<b>อนุมัติใบ ${esc(cur.certNo)} แล้ว</b> QA พิมพ์ใบได้`, 3400); open(toStore()); renderList();
       });
       $("#e_reject")?.addEventListener("click", () => {
         if (!canApprove || stOf(cur) !== "wait_approve") return;
-        const note = prompt("เหตุผลที่ตีกลับให้ QA แก้ไข (ไม่บังคับ):", "") ?? "";
-        cur.status = "request"; cur.rejectNote = note.trim(); cur.rejectedBy = me.name; cur.ts = Date.now();
+        const note = prompt("เหตุผลที่ตีกลับให้ QA แก้ไข (ไม่บังคับ):", ""); if (note === null) return; // กดยกเลิก = ไม่ตีกลับ
+        cur.status = "request"; cur.rejectNote = note.trim(); cur.rejectedBy = me.name; cur.rejections = [...(cur.rejections || []), { at: new Date().toISOString(), by: me.name, note: note.trim() }]; cur.ts = Date.now();
         coaPush(toStore()).then(renderList); toast(`<b>ตีกลับใบ ${esc(cur.certNo)} ให้ QA แก้ไขแล้ว</b>`, 3200); open(toStore()); renderList();
       });
     }
@@ -2896,7 +2932,7 @@ views.coa = {
       if (cur.status !== "new") {
         coaSave(coaRecs().filter(r => r.certNo !== no));
         const q = JSON.parse(localStorage.getItem(COA_KEY.queue) || "[]").filter(p => !(p.record && p.record.certNo === no));
-        q.push({ action: "deleteCoa", certNo: no }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); coaFlush().then(renderList);
+        q.push({ action: "deleteCoa", certNo: no, by: qOwner() }); localStorage.setItem(COA_KEY.queue, JSON.stringify(q)); coaFlush().then(renderList);
       }
       cur = null; p1edit = false; renderEditor(); renderPaper(); renderList(); toast(`<b>ลบร่าง ${esc(no)} แล้ว</b>`);
     });
@@ -2930,6 +2966,10 @@ views.coa = {
     const boot = () => { if (cur) { if (cur.status !== "new") { const r = coaRecs().find(x => x.certNo === cur.certNo); if (r) open(r); else { renderEditor(); renderPaper(); } } else { renderEditor(); renderPaper(); } } else { const want = params.get("no") && coaRecs().find(x => x.certNo === params.get("no")); const l = want || coaRecs().sort((a, b) => (b.ts || 0) - (a.ts || 0))[0]; if (l) open(l); else { cur = null; renderEditor(); renderPaper(); } } renderList(); }; // ไม่สร้างใบเปล่าอัตโนมัติ — กด + เพิ่ม COA เอง
     loadQuality(false).then(boot); coaRefresh().then(() => { boot(); if (tab === "dash") renderDash(); }); coaFlush();
     dpRefresh().then(ok => { if (ok && cur) renderEditor(); }); // รายการรถ/Lot ที่จ่ายออก (ฝ่ายขายเปิดหน้าจ่ายออกไม่ได้ จึงโหลดที่นี่)
+    if (canQc) apiFetch(apiUrl() + "?action=listApprovers").then(r => r.json()).then(j => { if (j.ok && j.names && j.names.length) { approverNames = j.names; if (cur && stOf(cur) === "request") renderEditor(); } }).catch(() => {}); // ผู้อนุมัติที่เพิ่มในหน้าตั้งค่าเลือกได้ทันที
+    // กลับมาเปิดแอป/แท็บนี้อีกครั้ง → ดึงใบล่าสุด ไม่ต้องออกแล้วเข้าใหม่
+    const onBack = () => { if (!root.isConnected) { document.removeEventListener("visibilitychange", onBack); return; } if (document.visibilityState === "visible") coaFlush().then(coaRefresh).then(ok => { if (ok && root.isConnected) { renderList(); if (tab === "dash") renderDash(); } }); };
+    document.addEventListener("visibilitychange", onBack);
     let lastSync = ""; const onCoaSync = () => { if (!document.body.contains(root)) { document.removeEventListener("qc:coa", onCoaSync); return; } renderList(); const s = cur && cur.status !== "new" ? JSON.stringify(coaSyncState(cur.certNo)) : ""; if (s !== lastSync) { lastSync = s; if (cur) renderEditor(); } };
     document.addEventListener("qc:coa", onCoaSync); // อัปเดตป้ายรอส่ง/ส่งไม่สำเร็จ ทั้งในรายการและในใบที่เปิดอยู่
     if (params.get("tab") === "dash") showTab("dash");
@@ -2967,7 +3007,8 @@ const repackCode = prodDate => {
   if (!m) return null;                                    // ต้องมีวันผลิตที่อ่านได้ เพื่อคำนวณหลักฤดู
   let y = +m[3]; if (y < 100) y += 2000; if (y > 2400) y -= 543; // พ.ศ. -> ค.ศ.
   const prodEndYear = (+m[2] >= 5) ? y + 1 : y;           // ฤดู Dec–Apr นับปีที่สิ้นสุด
-  const s = (prodEndYear === now.getFullYear()) ? 0 : 1;
+  const curEndYear = now.getFullYear() + (now.getMonth() === 11 ? 1 : 0); // ฤดูใหม่เริ่มเดือนธันวาคม
+  const s = (prodEndYear === curEndYear) ? 0 : 1;
   return "R" + dd + mm + s;
 };
 views.repack = {
@@ -2996,7 +3037,7 @@ views.repack = {
     const $ = s => root.querySelector(s);
     const sel = $("#rpLot"), info = $("#rpInfo"), okBtn = $("#rpOk"), recsEl = $("#rpRecords"), sync = $("#rpSync");
     const setSync = t => { if (sync) sync.innerHTML = t || ""; };
-    const curLot = () => { const v = (sel.value || "").trim(); return v ? (Q.rows || []).find(r => r.strike === v || String(r.strikeN) === v) : null; };
+    const curLot = () => { const v = (sel.value || "").trim(); const l = v ? strikeRow(v) : null; return l && !/organic/i.test(l.grade || "") ? l : null; }; // ออร์แกนิกไม่เข้า Repack ทั้งแบบเลือกและแบบพิมพ์
     const renderRecords = (recs, loading) => {
       if (loading) { recsEl.innerHTML = `<div class="rp-empty"><b>กำลังโหลด…</b></div>`; return; }
       if (!recs || !recs.length) { recsEl.innerHTML = `<div class="rp-empty"><img src="assets/mascot.png" alt=""><b>ยังไม่มีบันทึก Repack</b><span>เลือก Lot แล้วกด ตกลง เพื่อบันทึก</span></div>`; return; }
@@ -3033,7 +3074,7 @@ views.repack = {
     });
     setSync("กำลังโหลดรายการ Lot…");
     loadQuality(false).then(() => {
-      const rows = [...(Q.rows || [])].filter(r => !/organic/i.test(r.grade || "")).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
+      const rows = [...(Q.rows || [])].filter(r => !/organic/i.test(r.grade || "") && r === strikeRow(r.strike)).sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1));
       $("#rpLotList").innerHTML = rows.map(r => `<option value="${esc(r.strike)}"></option>`).join("");
       setSync(rows.length ? "" : "ไม่พบ Lot ในฐานข้อมูล");
     });
@@ -3275,8 +3316,12 @@ async function importFromSheets(log, opts = {}) {
   const rows = mapQuality(qt).map(r => { const o = { ...r }; delete o.dk; const n = seen[o.strike] = (seen[o.strike] || 0) + 1; o._k = n > 1 ? `${o.strike}~${n}` : o.strike; return o; });
   const specs = mapSpec(st).map(sp => ({ code: sp.code, name: sp.name, alt: sp.alt, product: sp.product, t: Object.fromEntries(SPEC_KEYS.map(k => [k, sp.rules[k] ? sp.rules[k].text : ""])) }));
   log(`  พบ ${rows.length} Lot · ${specs.length} สเปค`);
-  for (let i = 0; i < rows.length; i += 300) { await postApi({ action: "importData", replace: i === 0, quality: rows.slice(i, i + 300) }); log(`  ส่ง Lot ${Math.min(i + 300, rows.length)}/${rows.length}`); }
-  await postApi({ action: "importData", specs }); log("  ส่งสเปคแล้ว");
+  if (!rows.length) throw new Error("ไม่พบ Lot ในชีต Quality (หัวตารางเปลี่ยนหรือเปิดชีตไม่ได้) จึงไม่แตะข้อมูลในฐานข้อมูล");
+  // เขียนทับทีละชุดก่อน แล้วค่อยลบ Lot ที่ไม่อยู่ในชีตตอนท้าย: ถ้าเน็ตหลุดกลางทาง ข้อมูลเดิมไม่หาย
+  let startedAt = 0;
+  for (let i = 0; i < rows.length; i += 300) { const j = await postApi({ action: "importData", quality: rows.slice(i, i + 300) }); startedAt = startedAt || j.t; log(`  ส่ง Lot ${Math.min(i + 300, rows.length)}/${rows.length}`); }
+  if (startedAt) await postApi({ action: "importData", pruneQualityBefore: startedAt });
+  if (specs.length) { await postApi({ action: "importData", specs }); log("  ส่งสเปคแล้ว"); }
 
   if (opts.lotsOnly) return; // Repack บันทึกในแอปแล้ว ไม่ต้องดึงจากชีตเดิมอีก
   // รหัส Repack อยู่ในชีต Quality คอลัมน์ V เป็นต้นไป ; วันที่อยู่ในโน้ตของเซลล์ → ถามจากสคริปต์เดิม
@@ -3326,7 +3371,7 @@ async function exportAudit(from, to) {
       "พนักงานขับรถ": r.driverName || "", "หัวหน้ากะโลจิสติกส์": r.logisticsName || "", "ผู้บันทึก": (r.recordedBy && r.recordedBy.name) || "", "ผู้ตรวจสอบ (QA)": (r.checkedBy && r.checkedBy.name) || "", "ผู้อนุมัติ": (r.approvedBy && r.approvedBy.name) || "",
       "เหตุผลส่งกลับแก้ไข": r.returnNote || "", "เหตุผลไม่ผ่านอนุมัติ": r.rejectNote || "", "จำนวนรูปถ่าย": (r.photoUrls || []).length };
   });
-  const lotRows = disp.flatMap(r => (r.lots || []).filter(l => l.no).map(l => { const q = (Q.rows || []).find(x => x.strike === String(l.no));
+  const lotRows = disp.flatMap(r => (r.lots || []).filter(l => l.no).map(l => { const q = strikeRow(l.no);
     return { "เลขที่ใบจ่ายออก": docNo(r), "วันที่จ่ายออก": isoToDmy(r.date), "ทะเบียนรถ": r.plate || "", "ลูกค้าปลายทาง": r.customer || "", "Lot": String(l.no), "จำนวนกระสอบ": +l.bags || 0, "R (Repack)": l.r ? (l.rNum || "✓") : "",
       "เกรด": q ? q.grade : "", "วันผลิต": q ? q.date : "", "สถานะ Spec": q ? q.status : "", "สถานะใบจ่ายออก": stDp(r.status) }; }));
   const coaRows = coa.map(r => ({ "เลขที่ใบ": r.certNo, "แบบฟอร์ม": r.form || "", "สถานะ": stCoa(r), "Date": isoToDmy(r.reqDate), "COA Request No. (ฝกต.)": r.reqNo || "", "Company of Customer Request": r.customer || "", "Company of Import": r.importer || "",
@@ -3338,7 +3383,7 @@ async function exportAudit(from, to) {
     ...Object.fromEntries(COA_COLS.flatMap(c => [[`${c[1]} (${c[2]})`, l[c[0]] ?? ""], [`Spec ${c[1]}`, (r.spec || {})[c[0]] || ""]])), "ผลเทียบสเปค": (l.fails || []).length ? "ไม่ผ่าน: " + l.fails.join(" · ") : "ผ่าน" })));
   const histRows = [
     ...disp.flatMap(r => (r.log || []).map(x => ({ "เวลา": ts(x.ts), "_t": x.ts || "", "เอกสาร": "บันทึกจ่ายออก", "เลขที่": docNo(r), "ทะเบียนรถ": r.plate || "", "การกระทำ": DP.ACTIONS[x.action] || x.action, "โดย": x.by || "", "หมายเหตุ": x.note || "" }))),
-    ...coa.flatMap(r => [[r.requestedAt, "สร้างคำขอ (ส่วนที่ 1)", r.requestedBy, ""], [r.submittedAt, "QA ส่งให้ผู้อนุมัติ", r.submittedBy, ""], [r.approvedAt, "อนุมัติใบ COA", r.approvedActionBy, ""], [r.cancelledAt, "ยกเลิกใบ COA", r.cancelledBy, r.cancelReason]]
+    ...coa.flatMap(r => [[r.requestedAt, "สร้างคำขอ (ส่วนที่ 1)", r.requestedBy, ""], [r.submittedAt, "QA ส่งให้ผู้อนุมัติ", r.submittedBy, ""], ...(r.rejections || []).map(x => [x.at, "ผู้อนุมัติตีกลับให้ QA แก้ไข", x.by, x.note]), [r.approvedAt, "อนุมัติใบ COA", r.approvedActionBy, ""], [r.cancelledAt, "ยกเลิกใบ COA", r.cancelledBy, r.cancelReason]]
       .filter(x => x[0]).map(([t, a, by, note]) => ({ "เวลา": ts(t), "_t": t, "เอกสาร": "ใบ COA", "เลขที่": r.certNo, "ทะเบียนรถ": coaTrucksOf(r).join(", "), "การกระทำ": a, "โดย": by || "", "หมายเหตุ": note || "" }))),
   ].sort((a, b) => String(a._t).localeCompare(String(b._t))).map(x => { delete x._t; return x; });
 

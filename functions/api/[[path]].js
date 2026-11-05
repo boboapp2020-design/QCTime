@@ -138,6 +138,10 @@ const ACTIONS = {
     const r = await db.prepare("SELECT user, name, role, active, updated_at FROM users ORDER BY role, user").all();
     return { ok: true, users: r.results.map(u => ({ ...u, active: !!u.active })) };
   },
+  async listApprovers({ db }) { // รายชื่อให้ QA เลือกผู้อนุมัติ (เฉพาะชื่อ ไม่มีข้อมูลบัญชี)
+    const r = await db.prepare("SELECT name FROM users WHERE role = ?1 AND active = 1 ORDER BY user").bind(R.APPR).all();
+    return { ok: true, names: r.results.map(u => u.name) };
+  },
   async saveUser({ db, me, body, token }) {
     if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
     const u = body.user || {}; const user = String(u.user || "").trim().toLowerCase();
@@ -200,6 +204,7 @@ const ACTIONS = {
     delete rec.photos; delete rec.photoUrls;
     const prevRow = await db.prepare("SELECT data FROM dispatch WHERE uid = ?1").bind(rec.uid).first(); const prev = prevRow ? safeParse(prevRow.data) : null;
     if (!dispatchAllowed(me, prev, rec)) return { ok: false, error: "ไม่มีสิทธิ์เปลี่ยนสถานะใบนี้", status: 403 };
+    if (!prev) { const m = await db.prepare("SELECT MAX(CAST(json_extract(data, '$.id') AS INTEGER)) AS m FROM dispatch").first(); rec.id = ((m && m.m) || 0) + 1; } // เลขที่ใบออกโดยเซิร์ฟเวอร์ ไม่ซ้ำกันแม้กรอกพร้อมกันหลายเครื่อง
     await db.prepare("INSERT INTO dispatch (uid, date, status, owner, data, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(uid) DO UPDATE SET date = ?2, status = ?3, owner = ?4, data = ?5, updated_at = ?6")
       .bind(rec.uid, rec.date || "", rec.status || "", String((rec.recordedBy && rec.recordedBy.username) || "").toLowerCase(), JSON.stringify(rec), now()).run();
     return { ok: true, updated: !!prev };
@@ -277,6 +282,7 @@ const ACTIONS = {
   async importData({ db, me, body }) {
     if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
     const out = {}; const t = now();
+    if (Number(body.pruneQualityBefore) > 0) { const r = await db.prepare("DELETE FROM quality WHERE updated_at < ?1").bind(Number(body.pruneQualityBefore)).run(); out.pruned = r.meta.changes; }
     if (Array.isArray(body.quality)) {
       const st = body.replace ? [db.prepare("DELETE FROM quality")] : [];
       body.quality.forEach(row => { const s = String(row._k || row.strike || "").trim(); if (!s) return; const n = Number(row.strikeN ?? row.strike);
@@ -301,7 +307,7 @@ const ACTIONS = {
       const st = body.repack.filter(r => r.strike && r.day && r.rcode).map(r => db.prepare("INSERT OR REPLACE INTO repack (strike, day, rcode, by, at) VALUES (?1, ?2, ?3, ?4, ?5)").bind(String(r.strike), r.day, r.rcode, "import", t));
       await inChunks(db, st); out.repack = st.length;
     }
-    return { ok: true, imported: out };
+    return { ok: true, imported: out, t };
   },
 };
 const PUBLIC = new Set(["ping", "login"]);
