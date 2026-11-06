@@ -178,6 +178,18 @@ const ACTIONS = {
       .bind(key, isFinite(n) ? n : null, JSON.stringify({ ...row, _k: key }), now(), me.user).run();
     return { ok: true };
   },
+  async saveLots({ db, me, body }) { // อัปโหลด Excel: บันทึกหลาย Lot ครั้งเดียว (ไม่เกิน 200 แถวต่อคำขอ)
+    if (!allow(me, CAN.editQuality)) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขคุณภาพ", status: 403 };
+    const rows = Array.isArray(body.rows) ? body.rows : []; if (!rows.length || rows.length > 200) return { ok: false, error: "จำนวนแถวต้องอยู่ระหว่าง 1–200" };
+    const t = now(); const st = [];
+    for (const r of rows) {
+      const row = { ...(r || {}) }; delete row.pending; const strike = String(row.strike || "").trim(); const key = String(row._k || strike).trim();
+      if (!strike) return { ok: false, error: "มีแถวที่ไม่มีเลข Strike" };
+      const n = Number(row.strikeN ?? strike); row.strike = strike; row.by = me.name;
+      st.push(db.prepare("INSERT INTO quality (strike, n, data, updated_at, updated_by) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(strike) DO UPDATE SET n = ?2, data = ?3, updated_at = ?4, updated_by = ?5").bind(key, isFinite(n) ? n : null, JSON.stringify({ ...row, _k: key }), t, me.user));
+    }
+    await inChunks(db, st); return { ok: true, saved: st.length };
+  },
   async saveSpec({ db, me, body }) {
     if (!allow(me, CAN.editSpec)) return { ok: false, error: "ไม่มีสิทธิ์แก้ไขสเปค", status: 403 };
     const s = body.spec || {}; if (!String(s.name || "").trim()) return { ok: false, error: "กรอกชื่อลูกค้า" };
@@ -282,7 +294,7 @@ const ACTIONS = {
   async importData({ db, me, body }) {
     if (me.role !== R.ADMIN) return { ok: false, error: "เฉพาะผู้ดูแลระบบ", status: 403 };
     const out = {}; const t = now();
-    if (Number(body.pruneQualityBefore) > 0) { const r = await db.prepare("DELETE FROM quality WHERE updated_at < ?1").bind(Number(body.pruneQualityBefore)).run(); out.pruned = r.meta.changes; }
+    if (Number(body.pruneQualityBefore) > 0) { const r = await db.prepare("DELETE FROM quality WHERE updated_at < ?1 AND updated_by = 'import'").bind(Number(body.pruneQualityBefore)).run(); out.pruned = r.meta.changes; }
     if (Array.isArray(body.quality)) {
       const st = body.replace ? [db.prepare("DELETE FROM quality")] : [];
       body.quality.forEach(row => { const s = String(row._k || row.strike || "").trim(); if (!s) return; const n = Number(row.strikeN ?? row.strike);

@@ -645,6 +645,9 @@ body.phone-mode > #app { display: none; }
 }
 /* ---------- 5a3. editor tab + modal ---------- */
 .ed-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.up-pick { cursor: pointer; } .up-file { font-size: 13px; margin: 0 0 10px; overflow-wrap: anywhere; } .up-kpis { margin-bottom: 12px; }
+.up-box { border-radius: 12px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; background: #fff6e5; border: 1.5px solid #ffd58a; } .up-box.bad { background: #fdecec; border-color: #f3b4b6; } .up-box ul { margin: 6px 0 0; padding-left: 18px; max-height: 170px; overflow: auto; }
+.up-tbl { max-height: 42vh; overflow: auto; } .up-diff { display: inline-block; margin-right: 12px; white-space: nowrap; } .up-diff s { color: var(--ink-2); }
 .search.sm { padding: 3px 3px 3px 12px; border-radius: 14px; width: 220px; }
 .search.sm input { font-size: 15px; padding: 6px 0; }
 .ed-sync { margin-left: auto; display: flex; align-items: center; gap: 8px; }
@@ -1963,6 +1966,9 @@ function editorHtml() {
       ${chips("eGrade", [["", "ทุกเกรด"], ["DCR", "DCR"], ["VHP", "VHP"], ["Organic", "Organic"]])}
       <div class="ed-sync" id="edSync"></div>
       <button class="btn sm" id="addLot" type="button">+ เพิ่ม Lot ใหม่</button>
+      <label class="btn sm ghost up-pick" for="upFile">⬆ อัปโหลด Excel</label><input id="upFile" type="file" accept=".xlsx,.xls,.csv" hidden>
+      <button class="btn sm ghost" id="upBlank" type="button">⬇ แบบฟอร์มเปล่า</button>
+      <button class="btn sm ghost" id="upCurrent" type="button">⬇ ข้อมูลปัจจุบัน</button>
     </div>
     <div class="ed-wrap"><table class="ed">
       <thead><tr><th>Strike</th><th>เกรด</th><th>วันผลิต</th><th class="r">สี (IU)</th><th class="r">Pol (%)</th><th class="r">ชื้น (%)</th><th class="r">อินเวิร์ต (%)</th><th class="r">M.A. (mm)</th><th class="r">Ash</th><th class="r">Sediment</th><th>สถานะ</th><th>ผู้บันทึก</th><th></th></tr></thead>
@@ -1971,6 +1977,13 @@ function editorHtml() {
       <div class="ed-count" id="edCount"></div>
     </div>
   </div></section>
+  <div class="modal hide" id="upModal" role="dialog" aria-modal="true" aria-labelledby="upTitle">
+    <div class="modal-box">
+      <div class="modal-head"><h2 id="upTitle">ตรวจทานก่อนบันทึก</h2></div>
+      <div id="upBody"></div>
+      <div class="modal-foot"><span class="muted" id="upHint"></span><button type="button" class="btn ghost" id="upNo">ยกเลิก</button><button type="button" class="btn" id="upYes">บันทึก</button></div>
+    </div>
+  </div>
   <div class="modal hide" id="lotModal" role="dialog" aria-modal="true" aria-labelledby="lotModalTitle">
     <div class="modal-box">
       <div class="modal-head"><h2 id="lotModalTitle">เพิ่ม Lot ใหม่</h2><button type="button" class="icon-btn" id="lotClose" aria-label="ปิด">${ICON.cross.replace('stroke="#e5484d"', 'stroke="currentColor"')}</button></div>
@@ -2061,6 +2074,110 @@ function initEditor(root) {
   $("#eGrade").addEventListener("change", () => { E.limit = 100; renderEditor(root); });
   $("#edMoreBtn").addEventListener("click", () => { E.limit += 100; renderEditor(root); });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("#lotModal").classList.contains("hide")) closeModal(); });
+  initLotUpload(root);
+}
+
+/* ---------- 3b4. เพิ่ม/แก้ไขคุณภาพ Lot ด้วยไฟล์ Excel: อ่านไฟล์ในเครื่อง → ตรวจทาน → ค่อยบันทึก ---------- */
+const UP_COLS = ["strike", "grade", "date", "bb", "color", "pol", "moist", "invert", "ma", "ash", "sed", "status", "loc", "stock", "bags", "customer", "cert", "season"];
+const UP_NUM = ["color", "pol", "moist", "invert", "ma", "ash", "sed"];
+const upNorm = s => String(s ?? "").toLowerCase().replace(/[\s().%°_\-]/g, "");
+const UP_ALIAS = (() => { const m = {}; const add = (k, ...names) => names.forEach(n => m[upNorm(n)] = k);
+  UP_COLS.forEach(k => add(k, SHEET_HEADERS[k]));
+  add("strike", "Lot", "Strike", "เลข Lot", "เลข Strike", "Lot Number", "Lot No"); add("grade", "Grade", "เกรดน้ำตาล"); add("date", "Production date", "Production dates", "Prod date", "วันที่ผลิต");
+  add("bb", "Best before dates", "BB", "วันหมดอายุ"); add("color", "สี", "สี (IU)", "สี (ICU)", "Color", "Colour", "Color (IU)", "Color (ICU)"); add("pol", "Pol", "Polarization");
+  add("moist", "ความชื้น", "ชื้น", "Moisture"); add("invert", "อินเวิร์ต", "Invert", "Invert Sugar"); add("ma", "M.A.", "MA", "Target M.A", "Target M.A (mm)"); add("ash", "Ash", "เถ้า");
+  add("sed", "Sediment (ppm)", "ตะกอน"); add("status", "สถานะ", "Status"); add("season", "ฤดูผลิต", "ฤดู", "Season"); return m; })();
+const UP_LABEL = { ...Object.fromEntries(UP_COLS.map(k => [k, SHEET_HEADERS[k]])), season: "ฤดู / แผ่นที่มา" };
+// วันที่จาก Excel: เซลล์วันที่ (เลข serial) หรือข้อความ dd/mm/yyyy, d/m/yy, yyyy-mm-dd, พ.ศ. → dd/mm/yyyy · อ่านไม่ได้ = null
+function upDate(v, XLSX) {
+  const out = (d, m, y) => { if (y < 100) y += 2000; if (y > 2400) y -= 543; const t = new Date(y, m - 1, d); if (t.getFullYear() !== y || t.getMonth() !== m - 1 || t.getDate() !== d) return null; return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`; };
+  if (typeof v === "number") { const c = XLSX.SSF.parse_date_code(v); return c && c.y > 1990 ? out(c.d, c.m, c.y) : null; }
+  const s = String(v).trim(); let m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/); if (m) return out(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/); return m ? out(+m[3], +m[2], +m[1]) : null;
+}
+// หาแถวหัวตาราง (10 แถวแรก) ในชีตแรกที่มีคอลัมน์ Lot/Strike
+function upFindTable(wb, XLSX) {
+  for (const name of wb.SheetNames) { const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: "" });
+    for (let h = 0; h < Math.min(10, aoa.length); h++) { const cols = aoa[h].map(c => UP_ALIAS[upNorm(c)] || null); if (cols.includes("strike")) return { name, aoa, h, cols, ignored: aoa[h].filter((c, i) => String(c).trim() && !cols[i]).map(String) }; } }
+  return null;
+}
+// เทียบแต่ละแถวกับข้อมูลปัจจุบัน: ช่องว่าง = คงค่าเดิม · แถวผิดถูกแยกออก ไม่ถูกบันทึก
+function upAnalyze(tbl, XLSX) {
+  const res = { add: [], edit: [], same: 0, errors: [], warnings: [] }; const seen = new Map(); const now = nowText(), by = getUser().name;
+  tbl.aoa.slice(tbl.h + 1).forEach((cells, ri) => {
+    const rowNo = tbl.h + ri + 2, v = {}; tbl.cols.forEach((k, i) => { if (!k || k in v) return; const c = cells[i]; const s = typeof c === "string" ? c.trim() : c; if (s !== "" && s !== null && s !== undefined && s !== "—") v[k] = s; });
+    if (!Object.keys(v).length) return; const errs = [];
+    const strike = v.strike === undefined ? "" : String(v.strike).trim(); if (!strike) { res.errors.push({ rowNo, strike: "—", msg: "ไม่มีเลข Lot" }); return; }
+    const clean = {};
+    UP_COLS.forEach(k => { if (k === "strike" || v[k] === undefined) return; const x = v[k];
+      if (UP_NUM.includes(k)) { const n = num(x); if (n === null) errs.push(`${UP_LABEL[k]} "${x}" ไม่ใช่ตัวเลข`); else if (n < 0 || ((k === "pol" || k === "moist") && n > 100)) errs.push(`${UP_LABEL[k]} ${n} เกินช่วงที่เป็นไปได้`); else clean[k] = n; }
+      else if (k === "date" || k === "bb") { const d = upDate(x, XLSX); if (!d) errs.push(`${UP_LABEL[k]} "${x}" อ่านไม่ได้ (ใช้ วว/ดด/ปปปป)`); else clean[k] = d; }
+      else if (k === "grade") { const g = gradeOfProduct(String(x)); if (!g) errs.push(`เกรด "${x}" ไม่รู้จัก`); else clean.grade = g; }
+      else if (k === "status") { if (!QSTATUS[String(x).trim()]) errs.push(`สถานะ "${x}" ต้องเป็น ผ่าน / เฝ้าระวัง / ไม่ผ่าน`); else clean.status = String(x).trim(); }
+      else clean[k] = String(x).trim(); });
+    // จับคู่กับ Lot เดิม: เลข Strike ซ้ำข้ามฤดูต้องระบุวันผลิตให้ตรง
+    const hits = lotHits(strike); let base = hits[0] || null;
+    if (hits.length > 1) { base = clean.date ? hits.find(r => r.date === clean.date) : null; if (!base) errs.push(`Strike ${strike} มีหลายแถว (${hits.map(r => r.date || "ไม่มีวันผลิต").join(", ")}) ต้องระบุวันผลิตให้ตรงกับแถวที่จะแก้`); }
+    if (!base && !hits.length) { if (v.grade === undefined) errs.push("Lot ใหม่ต้องมีเกรด"); if (v.date === undefined) errs.push("Lot ใหม่ต้องมีวันผลิต"); if (v.status === undefined) errs.push("Lot ใหม่ต้องมีสถานะ Spec"); }
+    const key = base ? lotKey(base) : strike; const unresolved = hits.length > 1 && !base;
+    if (!unresolved) { if (seen.has(key)) errs.push(`ซ้ำกับแถว ${seen.get(key)} ในไฟล์นี้`); else seen.set(key, rowNo); }
+    if (errs.length) { res.errors.push({ rowNo, strike, msg: errs.join(" · ") }); return; }
+    if (!base) { const row = { color: null, pol: null, moist: null, invert: null, ma: null, ash: null, sed: null, bb: "", loc: "", stock: "", bags: "", customer: "", cert: "", season: getSettings().season || "", ...clean, _k: key, strike, strikeN: num(strike), dk: dateKey(clean.date), by, edited: now }; res.add.push({ rowNo, row }); return; }
+    const diffs = Object.keys(clean).filter(k => { const a = base[k], b = clean[k]; return UP_NUM.includes(k) ? a !== b : String(a ?? "") !== String(b); });
+    if (!diffs.length) { res.same++; return; }
+    const { pending, ...rest } = base; const row = { ...rest, ...clean, _k: key, strikeN: base.strikeN ?? num(strike), dk: dateKey(clean.date ?? base.date), by, edited: now };
+    res.edit.push({ rowNo, row, diffs: diffs.map(k => ({ k, from: base[k], to: clean[k] })) });
+    if (diffs.includes("date")) res.warnings.push(`แถว ${rowNo}: Lot ${strike} วันผลิตเปลี่ยนจาก ${base.date || "—"} เป็น ${clean.date} · ถ้าเป็นคนละ Lot ที่เลขซ้ำกัน อย่าบันทึกทับ`);
+  });
+  return res;
+}
+function upWriteFile(XLSX, rows, name) {
+  const headers = UP_COLS.map(k => SHEET_HEADERS[k]); const ws = XLSX.utils.aoa_to_sheet([headers, ...rows.map(r => UP_COLS.map(k => r[k] ?? "" ))]); ws["!cols"] = headers.map(h => ({ wch: Math.max(11, h.length + 2) })); ws["!freeze"] = { xSplit: 0, ySplit: 1 };
+  const help = XLSX.utils.aoa_to_sheet([["วิธีใช้"], ["1. กรอกในชีต Quality · แถวละ 1 Lot · ลบคอลัมน์ที่ไม่ใช้ออกได้ เหลืออย่างน้อยคอลัมน์ Lot (Strike)"], ["2. Lot ใหม่: ต้องมี Lot (Strike), เกรด (DCR / VHP / Organic), วันผลิต (วว/ดด/ปปปป) และสถานะ Spec (ผ่าน / เฝ้าระวัง / ไม่ผ่าน)"], ["3. แก้ Lot เดิม: ใส่เลข Lot และเฉพาะช่องที่จะแก้ · ช่องว่าง = คงค่าเดิม"], ["4. เลข Strike ที่ซ้ำข้ามฤดู: ต้องใส่วันผลิตให้ตรงกับแถวที่จะแก้"], ["5. อัปโหลดในหน้า ค้นหา Lot › แก้ไขข้อมูล · ระบบให้ตรวจทานก่อนบันทึกทุกครั้ง"]]); help["!cols"] = [{ wch: 90 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Quality"); XLSX.utils.book_append_sheet(wb, help, "วิธีใช้"); XLSX.writeFile(wb, name);
+}
+function initLotUpload(root) {
+  const $ = s => root.querySelector(s); let plan = null;
+  const close = () => { $("#upModal").classList.add("hide"); document.body.style.overflow = ""; plan = null; };
+  const fmtV = v => v === null || v === undefined || v === "" ? "ว่าง" : esc(String(v));
+  const SHOW = 300;
+  function preview(file, r, tbl) {
+    const nSave = r.add.length + r.edit.length;
+    const stat = (n, l, c = "") => `<div class="kpi ${c}"><b>${fmtInt(n)}</b><span>${l}</span></div>`;
+    $("#upTitle").textContent = "ตรวจทานก่อนบันทึก";
+    const rowsAdd = r.add.slice(0, SHOW).map(x => `<tr><td>${x.rowNo}</td><td class="strike">${esc(x.row.strike)}</td><td><span class="pill info">ใหม่</span></td><td>${esc(x.row.grade)} · ผลิต ${esc(x.row.date)} · สี ${fmtN(x.row.color, 0)} · Pol ${fmtN(x.row.pol, 2)} · ${esc(x.row.status)}</td></tr>`).join("");
+    const rowsEdit = r.edit.slice(0, SHOW).map(x => `<tr><td>${x.rowNo}</td><td class="strike">${esc(x.row.strike)}</td><td><span class="pill wait">แก้ไข</span></td><td>${x.diffs.map(d => `<span class="up-diff">${esc(UP_LABEL[d.k])}: <s>${fmtV(d.from)}</s> → <b>${fmtV(d.to)}</b></span>`).join("")}</td></tr>`).join("");
+    const more = Math.max(0, r.add.length - SHOW) + Math.max(0, r.edit.length - SHOW);
+    $("#upBody").innerHTML = `<p class="muted up-file">${esc(file.name)} · ชีต ${esc(tbl.name)}${tbl.ignored.length ? ` · ไม่ใช้คอลัมน์: ${esc(tbl.ignored.join(", "))}` : ""}</p>
+      <div class="kpis up-kpis">${stat(r.add.length, "Lot ใหม่", r.add.length ? "ok" : "")}${stat(r.edit.length, "Lot ที่แก้ไข", r.edit.length ? "warn" : "")}${stat(r.same, "ไม่เปลี่ยน")}${stat(r.errors.length, "แถวที่ผิด (ข้าม)", r.errors.length ? "bad" : "")}</div>
+      ${r.errors.length ? `<div class="up-box bad"><b>แถวเหล่านี้จะไม่ถูกบันทึก แก้ในไฟล์แล้วอัปโหลดซ้ำได้</b><ul>${r.errors.slice(0, 100).map(e => `<li>แถว ${e.rowNo} · Lot ${esc(e.strike)}: ${esc(e.msg)}</li>`).join("")}${r.errors.length > 100 ? `<li>และอีก ${r.errors.length - 100} แถว</li>` : ""}</ul></div>` : ""}
+      ${r.warnings.length ? `<div class="up-box warn"><b>โปรดตรวจ</b><ul>${r.warnings.slice(0, 30).map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : ""}
+      ${nSave ? `<div class="tbl-wrap up-tbl"><table class="ctab"><thead><tr><th>แถว</th><th>Lot</th><th>ประเภท</th><th>รายละเอียด</th></tr></thead><tbody>${rowsAdd}${rowsEdit}</tbody></table>${more ? `<p class="muted" style="font-size:12.5px;padding:6px 2px">แสดงบางส่วน ยังมีอีก ${fmtInt(more)} รายการ (จะถูกบันทึกด้วย)</p>` : ""}</div>` : `<div class="okline">ไม่มีข้อมูลที่ต้องบันทึก</div>`}`;
+    $("#upHint").textContent = "ใบ COA ที่อนุมัติแล้วไม่เปลี่ยนตาม"; const y = $("#upYes"); y.hidden = !nSave; y.disabled = false; y.textContent = `บันทึก ${fmtInt(nSave)} รายการ`;
+    plan = [...r.add, ...r.edit].map(x => x.row); $("#upModal").classList.remove("hide"); document.body.style.overflow = "hidden";
+  }
+  $("#upFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+    if (!Q.rows) { toast("ยังโหลดข้อมูล Lot ไม่เสร็จ ลองอีกครั้ง"); return; }
+    try {
+      const XLSX = await loadXlsx(); let wb;
+      try { wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); } catch (err) { toast("<b>เปิดไฟล์ไม่ได้</b> ไฟล์อาจถูกเข้ารหัสหรือป้องกันไว้ ให้คัดลอกข้อมูลลงแบบฟอร์มเปล่าแล้วอัปโหลดใหม่", 5500); return; }
+      const tbl = upFindTable(wb, XLSX); if (!tbl) { toast("<b>ไม่พบคอลัมน์ Lot (Strike)</b> ใช้แบบฟอร์มเปล่าเป็นต้นแบบ", 4500); return; }
+      preview(file, upAnalyze(tbl, XLSX), tbl);
+    } catch (err) { toast(`<b>อ่านไฟล์ไม่สำเร็จ</b> ${esc(err.message)}`, 4500); }
+  });
+  $("#upNo").addEventListener("click", close);
+  $("#upYes").addEventListener("click", async () => {
+    if (!plan || !plan.length) return; const rows = plan, y = $("#upYes"), no = $("#upNo"); y.disabled = no.disabled = true; let saved = 0;
+    try {
+      for (let i = 0; i < rows.length; i += 200) { await postApi({ action: "saveLots", rows: rows.slice(i, i + 200) }); saved = Math.min(i + 200, rows.length); y.textContent = `กำลังบันทึก ${fmtInt(saved)}/${fmtInt(rows.length)}`; }
+      toast(`<b>บันทึกแล้ว ${fmtInt(saved)} Lot</b>`, 3200);
+    } catch (err) { toast(`<b>บันทึกได้ ${fmtInt(saved)} จาก ${fmtInt(rows.length)} Lot</b> ${esc(err.message)} · อัปโหลดไฟล์เดิมซ้ำได้ ระบบจะทำเฉพาะที่เหลือ`, 6000); }
+    no.disabled = false; close(); await loadQuality(true); renderEditor(root); root.dispatchEvent(new CustomEvent("qc:data"));
+  });
+  const dl = async (rows, name) => { try { upWriteFile(await loadXlsx(), rows, name); toast("⬇ ดาวน์โหลดแล้ว"); } catch (e) { toast(`<b>สร้างไฟล์ไม่ได้</b> ${esc(e.message)}`, 4000); } };
+  $("#upBlank").addEventListener("click", () => dl([], "QCTime-แบบฟอร์ม-Lot.xlsx"));
+  $("#upCurrent").addEventListener("click", () => { if (!Q.rows) { toast("ยังโหลดข้อมูล Lot ไม่เสร็จ"); return; } dl([...Q.rows].sort((a, b) => (b.strikeN ?? -1) - (a.strikeN ?? -1)).map(r => ({ ...r, grade: r.grade === "—" ? "" : r.grade })), `QCTime-Lot-${todayIso().replace(/-/g, "")}.xlsx`); });
 }
 
 /* ---------- 3c. release · บันทึกการส่งมอบน้ำตาล (logic ported from SugarDeliveryApp, form ML-FM-1610-012 Rev.07) ---------- */
@@ -2493,7 +2610,7 @@ function dpProgUpdate() { const p = dpProgress(draft), fill = $("#dpProgFill"); 
       const d = draft;
       if (step === 0) { if (!d.date) return "กรุณาเลือกวันที่"; if (!/^\d{2}\/\d{2}$/.test(d.prodYear || "")) return "กรอกปีการผลิต / ฤดู ให้ครบ 4 หลัก เช่น 25/26"; if (!seasonOk(d.prodYear)) return "ปีการผลิต / ฤดู ต้องเป็นปีติดกัน เช่น 25/26"; if (!d.timeStart) return "กรุณาระบุเวลาเริ่มขึ้นน้ำตาล"; if (!d.plate) return "กรุณากรอกทะเบียนรถ"; if (!d.customer) return "กรุณากรอกลูกค้าปลายทาง"; if (!d.truckType) return "กรุณาเลือกประเภทรถบรรทุก"; }
       if (step === 1) { const miss = dpChecksFor(d).filter(c => !d.checks[c.id]); if (miss.length) return `ยังไม่ได้ตรวจ: ${miss[0].name} (เหลือ ${miss.length} รายการ)`; if (!(d.photos || []).length && !(d.photoUrls || []).length) return "กรุณาแนบรูปสภาพรถอย่างน้อย 1 รูป"; }
-      if (step === 2) { if (!d.sugarType) return "กรุณาเลือกชนิดน้ำตาล"; if (!d.pack) return "กรุณาเลือกขนาดบรรจุ"; if (!d.bay) return "กรุณาเลือกคลังที่ขึ้นน้ำตาล"; if (!d.lots.length) return "กรุณาเพิ่มอย่างน้อย 1 Lot"; const bad = d.lots.findIndex(l => !l.no || !(+l.bags > 0)); if (bad >= 0) return `Lot ที่ ${bad + 1} ยังไม่ครบ (เลือก Lot / จำนวนกระสอบ)`; const notInDb = d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน")); if (notInDb >= 0) return `Lot ที่ ${notInDb + 1} (${esc(d.lots[notInDb].no)}) ไม่มีในฐานข้อมูลหรือไม่ผ่าน จ่ายออกไม่ได้`; { const g = gradeOfSugar(d.sugarType); const wrong = g ? d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน" && (r.grade === g || !r.grade))) : -1; if (wrong >= 0) return `Lot ที่ ${wrong + 1} (${esc(d.lots[wrong].no)}) ไม่ใช่น้ำตาล ${esc(g)} ตามชนิดที่เลือก`; } if (!(dpTons(d) > 0)) return "จำนวนบรรทุกต้องมากกว่า 0 ตัน"; }
+      if (step === 2) { if (!d.sugarType) return "กรุณาเลือกชนิดน้ำตาล"; if (!d.pack) return "กรุณาเลือกขนาดบรรจุ"; if (!d.bay) return "กรุณาเลือกคลังที่ขึ้นน้ำตาล"; if (!d.lots.length) return "กรุณาเพิ่มอย่างน้อย 1 Lot"; const bad = d.lots.findIndex(l => !l.no || !(+l.bags > 0)); if (bad >= 0) return `Lot ที่ ${bad + 1} ยังไม่ครบ (เลือก Lot / จำนวนกระสอบ)`; const notInDb = d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน")); if (notInDb >= 0) return `Lot ที่ ${notInDb + 1} (${esc(d.lots[notInDb].no)}) ไม่มีในฐานข้อมูลหรือไม่ผ่าน จ่ายออกไม่ได้`; { const g = gradeOfSugar(d.sugarType); const wrong = g ? d.lots.findIndex(l => !(Q.rows || []).some(r => r.strike === String(l.no) && r.status === "ผ่าน" && (r.grade === g || !r.grade || r.grade === "—"))) : -1; if (wrong >= 0) return `Lot ที่ ${wrong + 1} (${esc(d.lots[wrong].no)}) ไม่ใช่น้ำตาล ${esc(g)} ตามชนิดที่เลือก`; } if (!(dpTons(d) > 0)) return "จำนวนบรรทุกต้องมากกว่า 0 ตัน"; }
       if (step === 3) { if (!d.tarp) return "กรุณาเลือกสถานะการปกผ้าใบ / Seal"; if (d.truckType === "รถตู้คอนเทนเนอร์ (Container)" && !d.seal) return "กรุณากรอก Seal No. สำหรับตู้คอนเทนเนอร์"; if (!d.timeEnd) return "กรุณาระบุเวลาขึ้นเสร็จ"; if (!d.driverName) return "กรุณาพิมพ์ชื่อพนักงานขับรถ"; if (!d.logisticsName) return "กรุณาพิมพ์ชื่อหัวหน้ากะโลจิสติกส์"; }
       return "";
     }
@@ -3283,7 +3400,7 @@ views.settings = {
       catch (e) { log("✕ หยุด: " + e.message); toast(`<b>นำเข้าไม่สำเร็จ</b> ${esc(e.message)}`, 4000); }
       finally { root.querySelectorAll("#impBtn, #impLotsBtn").forEach(b => b.disabled = false); }
     };
-    $("#impLotsBtn").addEventListener("click", e => runImport(e.currentTarget, { lotsOnly: true }, "อัปเดต Lot และสเปคลูกค้าจาก Google Sheets?\n\n• ข้อมูล Lot และสเปคในฐานข้อมูลจะถูกแทนที่ด้วยข้อมูลในชีต\n• Lot ที่แก้ไขในแอปแต่ไม่ได้แก้ในชีต จะกลับเป็นค่าตามชีต\n• ไม่แตะผู้ใช้ บันทึกจ่ายออก ใบ COA และ Repack ที่บันทึกในแอป"));
+    $("#impLotsBtn").addEventListener("click", e => runImport(e.currentTarget, { lotsOnly: true }, "อัปเดต Lot และสเปคลูกค้าจาก Google Sheets?\n\n• ข้อมูล Lot และสเปคในฐานข้อมูลจะถูกแทนที่ด้วยข้อมูลในชีต\n• Lot ที่มีทั้งในชีตและในแอป จะใช้ค่าตามชีต (ค่าที่แก้ในแอปหรืออัปโหลด Excel จะถูกทับ)\n• Lot ที่เพิ่มในแอปหรืออัปโหลด Excel แต่ไม่มีในชีต จะยังอยู่\n• ไม่แตะผู้ใช้ บันทึกจ่ายออก ใบ COA และ Repack ที่บันทึกในแอป"));
     $("#impBtn").addEventListener("click", e => runImport(e.currentTarget, {}, "นำเข้าข้อมูลทั้งหมดจาก Google Sheets?\n\n• Lot และสเปคจะแทนที่ข้อมูลในฐานข้อมูล\n• ผู้ใช้: เพิ่มเฉพาะบัญชีที่ยังไม่มี (ไม่เปลี่ยนรหัสของบัญชีเดิม)\n• บันทึกจ่ายออก / ใบ COA จากระบบเดิม: เพิ่มหรือแทนที่ตามเลขที่\n• ข้อมูลในชีตไม่ถูกลบ"));
     // ค่าเริ่มต้น: ตั้งแต่ 1 ธ.ค. ของฤดูหีบล่าสุด ถึงวันนี้
     { const d = new Date(); const y = d.getMonth() >= 11 ? d.getFullYear() : d.getFullYear() - 1; $("#auFrom").value = `${y}-12-01`; $("#auTo").value = todayIso(); }
